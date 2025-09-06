@@ -159,7 +159,8 @@ export class DiscordBotService {
       // Handle both single media and array of media
       const mediaItems = Array.isArray(asyncResult.mediaData) ? asyncResult.mediaData : [asyncResult.mediaData];
 
-      for (const mediaData of mediaItems) {
+      for (let i = 0; i < mediaItems.length; i++) {
+        const mediaData = mediaItems[i];
         const embed = new EmbedBuilder()
           .setTitle(mediaData.caption || '🏘️ Village Image Generated!')
           .setDescription(asyncResult.message || 'Here\'s your village!')
@@ -171,6 +172,8 @@ export class DiscordBotService {
           embeds: [embed]
           // No ephemeral flag - image visible to everyone
         });
+
+        // No delay between images - send them as soon as they're ready
       }
     } else if (asyncResult.message) {
       await interaction.followUp({

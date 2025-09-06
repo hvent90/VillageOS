@@ -191,65 +191,48 @@ export class CommandProcessorService {
 
 
 
-      // Generate both village update and cinematic scene
+      // Generate village update (composite) first
       const villageUpdatePromise = this.generatePlantVillageUpdate(village, plant, plantDescription, position.x, position.y, user.id);
 
-      // Combine both results into a single async work
-      const combinedAsyncWork = async (): Promise<AsyncWorkResult> => {
-        const villageUpdateResult = await villageUpdatePromise;
+      // Wait for composite to complete and send it immediately
+      const villageUpdateResult = await villageUpdatePromise;
 
-        // Check if village update was successful and has plant baseline URL
-        const plantBaselineUrl = 'plantBaselineUrl' in villageUpdateResult ? villageUpdateResult.plantBaselineUrl : undefined;
-
-        // Now generate cinematic scene with the plant baseline URL
-        const cinematicPromise = this.generateCinematicPlantingScene(
-          plantDescription,
-          user.baselineUrl || undefined,
-          village.baselineUrl || undefined,
-          plantBaselineUrl, // Pass the plant baseline URL if available
-          user.id
-        );
-
-        const [cinematicResult] = await Promise.allSettled([cinematicPromise]);
-
-        const mediaItems: MediaData[] = [];
-        let combinedMessage = '';
-
-        // Handle village update result
-        if ('result' in villageUpdateResult && villageUpdateResult.result.mediaData) {
-          const media = Array.isArray(villageUpdateResult.result.mediaData)
-            ? villageUpdateResult.result.mediaData
-            : [villageUpdateResult.result.mediaData];
-          mediaItems.push(...media);
-          if (villageUpdateResult.result.message) {
-            combinedMessage += villageUpdateResult.result.message + '\n';
-          }
-        }
-
-        // Handle cinematic result
-        if (cinematicResult.status === 'fulfilled' && cinematicResult.value.mediaData) {
-          const media = Array.isArray(cinematicResult.value.mediaData)
-            ? cinematicResult.value.mediaData
-            : [cinematicResult.value.mediaData];
-          mediaItems.push(...media);
-          if (cinematicResult.value.message) {
-            combinedMessage += cinematicResult.value.message + '\n';
-          }
-        } else if (cinematicResult.status === 'rejected') {
-          combinedMessage += `❌ Cinematic generation failed: ${cinematicResult.reason}\n`;
-        }
-
+      if (!('result' in villageUpdateResult) || !villageUpdateResult.result.mediaData) {
         return {
-          mediaData: mediaItems.length > 0 ? mediaItems : undefined,
-          message: combinedMessage.trim() || 'Planting completed!'
+          success: false,
+          error: { type: 'INTERNAL', message: 'result' in villageUpdateResult ? (villageUpdateResult.result.message || 'Failed to update village') : 'Failed to update village' }
         };
+      }
+
+      // Start cinematic generation in background
+      const plantBaselineUrl = 'plantBaselineUrl' in villageUpdateResult ? villageUpdateResult.plantBaselineUrl : undefined;
+      const cinematicAsyncWork = async (): Promise<AsyncWorkResult> => {
+        try {
+          const cinematicResult = await this.generateCinematicPlantingScene(
+            plantDescription,
+            user.baselineUrl || undefined,
+            village.baselineUrl || undefined,
+            plantBaselineUrl,
+            user.id
+          );
+
+          return cinematicResult;
+        } catch (error) {
+          console.error('Cinematic generation failed:', error);
+          return {
+            message: `❌ Cinematic generation failed: ${error instanceof Error ? error.message : String(error)}`
+          };
+        }
       };
 
       return {
         success: true,
-        message: `🌱 You planted ${plantDescription}! Generating your updated village and cinematic scene...`,
+        message: villageUpdateResult.result.message || `🌱 Successfully planted ${plantDescription} in your village!`,
+        mediaData: Array.isArray(villageUpdateResult.result.mediaData)
+          ? villageUpdateResult.result.mediaData[0]
+          : villageUpdateResult.result.mediaData,
         data: { plant, village },
-        asyncWork: combinedAsyncWork()
+        asyncWork: cinematicAsyncWork()
       };
 
     } catch (error) {
