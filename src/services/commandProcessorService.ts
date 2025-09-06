@@ -347,7 +347,7 @@ export class CommandProcessorService {
         success: true,
         message: `🏗️ You built ${structureDescription}! Generating your updated village...`,
         data: { structure, village },
-        asyncWork: this.generateTwoStepStructureBaseline(village, structure, structureDescription, position.x, position.y)
+        asyncWork: this.generateSingleStepStructureBaseline(village, structure, structureDescription, position.x, position.y)
       };
 
     } catch (error) {
@@ -592,7 +592,7 @@ export class CommandProcessorService {
     }
   }
 
-  private async generateTwoStepStructureBaseline(
+  private async generateSingleStepStructureBaseline(
     village: any,
     structure: any,
     structureDescription: string,
@@ -604,13 +604,7 @@ export class CommandProcessorService {
         throw new Error('Required services not available');
       }
 
-      // Step 1: Generate structure baseline
-      const structureBaselineUrl = await this.villageImageService.generateStructureBaseline(structureDescription);
-
-      // Update structure object with baseline URL
-      await this.villageRepository.updateObjectBaseline(structure.id, structureBaselineUrl);
-
-      // Step 2: Update village baseline with new structure
+      // Single step: Generate updated village with structure directly
       const villageName = village.name || `Village ${village.guildId.slice(-4)}`;
       const currentVillageBaseline = village.baselineUrl;
 
@@ -618,16 +612,18 @@ export class CommandProcessorService {
         throw new Error('Village has no baseline image to update');
       }
 
-      const updatedVillageBaselineUrl = await this.villageImageService.updateVillageBaseline(
+      const updatedVillageBaselineUrl = await this.villageImageService.generateVillageWithStructure(
         villageName,
         currentVillageBaseline,
-        structureBaselineUrl,
+        structureDescription,
         gridX,
-        gridY,
-        'structure'
+        gridY
       );
 
-      // Step 3: Save new village baseline
+      // Update structure object (no baseline URL needed for single-step)
+      // await this.villageRepository.updateObjectBaseline(structure.id, null);
+
+      // Save new village baseline
       await this.villageRepository.updateVillageBaselineByGuildId(village.guildId, updatedVillageBaselineUrl);
 
       return {
@@ -642,7 +638,7 @@ export class CommandProcessorService {
       };
 
     } catch (error) {
-      console.error('Failed to generate two-step structure baseline:', error);
+      console.error('Failed to generate single-step structure baseline:', error);
       return {
         message: `✅ Structure added successfully! The village image will be updated shortly.`
       };

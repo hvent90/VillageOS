@@ -16,6 +16,22 @@ Join the Discord server to interact with the bot: [https://discord.gg/PzzvE8KK](
 1. The underlying architecture is platform agnostic - meaning users could work on their farm together in a text group chat! This gaming platform can meet users on whatever platform they are currently using.
 2. We are entering into a truly new era of interactive experiences. I've been an indie game dev for half a decade and this is the first time where a user can grow a fictional plant they made up in their mind one minute prior to seeing it live.
 
+### What I'd Do With an Extra Day
+
+1. Deterministic object placement and manipulation: Essentially a psuedo-world-model by programatically generating a simple color mask of the world's state and then passing that to Nano Banana for the image makeover.
+2. Resource consumption and growth
+3. life cycle for platns
+
+---
+
+## Screenshots
+
+Here are some visual examples of VillageOS in action:
+
+<img src="docs/lavatown.png" alt="Lavatown" height="400"/>
+<img src="docs/lavatown-2.png" alt="Lavatown 2" height="400"/>
+<img src="docs/lavatown-3.png" alt="Lavatown 3" height="400"/>
+
 ---
 
 # VillageOS - Collaborative Farming Simulator

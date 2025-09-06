@@ -231,6 +231,36 @@ Single plant, centered, no other objects. Generate exactly what the user describ
     return tempFileInfo.url;
   }
 
+  async generateVillageWithStructure(
+    villageName: string,
+    currentVillageBaselineUrl: string,
+    structureDescription: string,
+    gridX: number,
+    gridY: number
+  ): Promise<string> {
+    // Fetch the current village baseline image for single-modal prompt generation
+    const villageImageResponse = await fetch(currentVillageBaselineUrl);
+    const villageImageBuffer = await villageImageResponse.arrayBuffer();
+
+    const imageData = [
+      { data: Buffer.from(villageImageBuffer), mimeType: 'image/png' }   // Village baseline only
+    ];
+
+    const prompt = await this.llmPromptService.generate(
+      this.createVillageWithStructurePrompt(villageName, structureDescription, gridX, gridY),
+      imageData
+    );
+
+    const tempFileInfo = await this.mediaGenerationService.generateMedia({
+      prompt,
+      type: 'image',
+      jobType: 'ADDING_STRUCTURE_TO_VILLAGE',
+      baselineImages: [currentVillageBaselineUrl]  // Single baseline reference
+    });
+
+    return tempFileInfo.url;
+  }
+
   private createVillageBaselineUpdatePrompt(villageName: string, gridX: number, gridY: number, objectType: 'plant' | 'structure' = 'plant'): string {
     const objectTypeText = objectType === 'plant' ? 'plant' : 'structure';
 
@@ -250,5 +280,32 @@ CRITICAL REQUIREMENTS:
 - Ensure the ${objectTypeText} fits naturally into the existing village composition
 
 Both reference images show the visual context needed for natural ${objectTypeText} placement.`;
+  }
+
+  private createVillageWithStructurePrompt(villageName: string, structureDescription: string, gridX: number, gridY: number): string {
+    return `You are adding a structure to an existing farming village scene. You have one reference image showing the current village layout.
+
+Add a single structure described as "${structureDescription}" to the village scene shown in the reference image.
+
+CRITICAL REQUIREMENTS:
+- Generate the structure directly in the context of the existing village - do not create it separately
+- The structure should be: ${structureDescription}
+- This is a farming village, so ensure the structure fits the agricultural theme (barn, shed, well, greenhouse, etc.)
+- Place the structure at a reasonable size that fits naturally in the village scene
+- Position the structure in an appropriate location within the village that doesn't overlap existing elements
+- Maintain the same art style and visual quality as the reference village image
+- Ensure the structure fits naturally into the existing village composition and aesthetic
+- The structure should look like it belongs in a farming village setting with appropriate materials and design
+- Use the reference image to understand the current village layout, existing elements, and available space
+- Feel free to adjust perspective, angle, and lighting as needed to make the structure fit naturally
+- Consider the structure's function when placing it (storage near fields, water sources near crops, etc.)
+
+VISUAL INTEGRATION GUIDELINES:
+- Match the color palette and material textures of existing village elements
+- Ensure consistent lighting and shadow direction
+- Maintain the same level of detail and artistic style
+- Make the structure look like it's always been part of the village
+
+The reference image shows the current village context needed for natural structure placement and integration.`;
   }
 }

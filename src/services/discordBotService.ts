@@ -39,10 +39,19 @@ export class DiscordBotService {
   }
 
   private async handleSlashCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    // CRITICAL: Defer IMMEDIATELY to meet Discord's 3-second timeout
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
     const commandInput = this.parseCommand(interaction);
+
+    // Check if this command might generate images (should be public)
+    const isImageGeneratingCommand = this.isImageGeneratingCommand(commandInput);
+
+    // CRITICAL: Defer IMMEDIATELY to meet Discord's 3-second timeout
+    // Only make ephemeral for non-image commands
+    if (isImageGeneratingCommand) {
+      await interaction.deferReply(); // No ephemeral flag - images visible to everyone
+    } else {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    }
+
     const result = await this.commandProcessor.handleCommand(commandInput);
 
     // Create Discord platform adapter for this interaction
@@ -91,6 +100,16 @@ export class DiscordBotService {
       default:
         return CommandName.SHOW; // Default fallback
     }
+  }
+
+  private isImageGeneratingCommand(commandInput: CommandInput): boolean {
+    // Check if this command will generate images that should be visible to everyone
+    if (commandInput.name === CommandName.SHOW) {
+      // For village commands, check the subcommand
+      const subcommand = commandInput.args?.subcommand;
+      return subcommand === 'plant' || subcommand === 'build' || subcommand === 'create';
+    }
+    return false;
   }
 
    private extractArgs(interaction: ChatInputCommandInteraction): any {

@@ -57,7 +57,6 @@ describe('DiscordBot Welcome Integration', () => {
     MockClient.mockImplementation(() => mockClient);
 
     discordBot = new DiscordBotService('fake-token');
-    discordBot.setWelcomeService(welcomeService);
   });
 
   describe('handleGuildMemberAdd', () => {
