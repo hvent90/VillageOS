@@ -4,7 +4,10 @@ import logger from '../config/logger';
 export interface PromptEnhancementRequest {
   basePrompt: string;
   userDescription?: string;
-  referenceImageUrl?: string;
+  referenceImageUrl?: string;  // Keep for backward compatibility
+  referenceImageData?: Buffer | string;  // NEW: Direct image data
+  referenceImageMimeType?: string;  // NEW: MIME type for direct data
+  referenceImages?: Array<{ data: Buffer | string, mimeType: string }>;  // NEW: Multiple images
   villageName?: string;
   actionType?: string;
 }
@@ -234,15 +237,59 @@ export class LLMPromptService {
     this.textModel = textModel;
   }
 
-  async generate(instructions: string): Promise<string> {
+  async generate(
+    instructions: string,
+    imageData?: { data: Buffer | string, mimeType: string } | Array<{ data: Buffer | string, mimeType: string }>
+  ): Promise<string> {
     const prompt = 'You are generating a prompt for an image generation model called "Nano Banana".' +
         `<prompt_guidelines>${promptingGuidelines}</prompt_guidelines>` +
         `<instructions>${instructions}</instructions>
         Now generate a new prompt.`;
 
+    // Handle multi-modal content preparation
+    let contents: any[] = [{ text: prompt }];
+
+    if (imageData) {
+      if (Array.isArray(imageData)) {
+        // Handle multiple images
+        const imageContents = imageData.map(img => {
+          const base64Data = img.data instanceof Buffer
+            ? img.data.toString('base64')
+            : img.data;
+
+          return {
+            inlineData: {
+              mimeType: img.mimeType,
+              data: base64Data,
+            },
+          };
+        });
+
+        contents = [
+          { text: prompt },
+          ...imageContents
+        ];
+      } else {
+        // Handle single image (backward compatibility)
+        const base64Data = imageData.data instanceof Buffer
+          ? imageData.data.toString('base64')
+          : imageData.data;
+
+        contents = [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: imageData.mimeType,
+              data: base64Data,
+            },
+          },
+        ];
+      }
+    }
+
     const response = await this.ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: [{ text: prompt }]
+      contents: contents
     });
 
     let enhancement = '';

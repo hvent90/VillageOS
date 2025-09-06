@@ -191,7 +191,7 @@ export class CommandProcessorService {
 
       return {
         success: true,
-        message: `🌱 You planted ${plantDescription} at position (${position.x}, ${position.y})! Generating your updated village...`,
+        message: `🌱 You planted ${plantDescription}! Generating your updated village...`,
         data: { plant, village },
         asyncWork: this.generateTwoStepPlantBaseline(village, plant, plantDescription, position.x, position.y)
       };

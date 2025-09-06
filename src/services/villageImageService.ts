@@ -49,7 +49,11 @@ User wants their village to look like: "${description}".
 The village is currently an EMPTY PLOT OF LAND.
 The central area is an empty farm, currently a dirt patch suitable for growing crops.
 
+If the user has not specified a style or aesthetic, default to a cute pixel-art style.
+
 Create an optimized prompt for Gemini AI image generation that will produce a beautiful, atmospheric village scene suitable for a collaborative farming game.
+
+Make sure that the camera is from a near-birdseye perspective. We want to be able to showcase a lot of land that we can further develop later on a near equally-distant plane from the camera.
 
 Return only the optimized prompt, no additional text or explanation.`;
 
@@ -151,7 +155,7 @@ This will serve as the village's visual representation in the game showing all c
   }
 
   async generatePlantBaseline(plantDescription: string): Promise<string> {
-    const prompt = this.createPlantBaselinePrompt(plantDescription);
+    const prompt = await this.llmPromptService.generate(this.createPlantBaselinePrompt(plantDescription));
 
     const tempFileInfo = await this.mediaGenerationService.generateMedia({
       prompt,
@@ -165,7 +169,7 @@ This will serve as the village's visual representation in the game showing all c
   private createPlantBaselinePrompt(plantDescription: string): string {
     return `A detailed plant: ${plantDescription}.
 Show as a small seedling just sprouted from the ground.
-Pixel art style, clean background, farming game aesthetic.
+If the user has not specified a style or aesthetic, default to a cute pixel-art style.
 Single plant, centered, no other objects. Generate exactly what the user described.`;
   }
 
@@ -176,12 +180,31 @@ Single plant, centered, no other objects. Generate exactly what the user describ
     gridX: number,
     gridY: number
   ): Promise<string> {
-    const prompt = this.createVillageBaselineUpdatePrompt(villageName, gridX, gridY);
+    // Fetch both plant baseline and village baseline images for multi-modal prompt generation
+    const [plantImageResponse, villageImageResponse] = await Promise.all([
+      fetch(plantBaselineUrl),
+      fetch(currentVillageBaselineUrl)
+    ]);
+
+    const [plantImageBuffer, villageImageBuffer] = await Promise.all([
+      plantImageResponse.arrayBuffer(),
+      villageImageResponse.arrayBuffer()
+    ]);
+
+    const imageData = [
+      { data: Buffer.from(plantImageBuffer), mimeType: 'image/png' },     // Plant baseline
+      { data: Buffer.from(villageImageBuffer), mimeType: 'image/png' }   // Village baseline
+    ];
+
+    const prompt = await this.llmPromptService.generate(
+      this.createVillageBaselineUpdatePrompt(villageName, gridX, gridY),
+      imageData
+    );
 
     const tempFileInfo = await this.mediaGenerationService.generateMedia({
       prompt,
       type: 'image',
-      jobType: 'VILLAGE_BASELINE',
+      jobType: 'ADDING_PLANT_TO_VILLAGE',
       baselineImages: [currentVillageBaselineUrl, plantBaselineUrl]
     });
 
@@ -189,7 +212,21 @@ Single plant, centered, no other objects. Generate exactly what the user describ
   }
 
   private createVillageBaselineUpdatePrompt(villageName: string, gridX: number, gridY: number): string {
-    return `Update the existing landscape by adding a single instance of the plant in an appropriate area in the farm. `
-        + 'The plant should be at a reasonable size to allow and not take up too much space.';
+    return `You are adding a plant to an existing village scene. You have two reference images:
+1. First image: The plant's appearance that needs to be added
+2. Second image: The current village scene where the plant should be placed
+
+Update the existing village landscape by adding a single instance of the plant from the first reference image to the village scene shown in the second reference image.
+
+CRITICAL REQUIREMENTS:
+- The plant must match EXACTLY the appearance, colors, and features shown in the first reference image
+- Use the second reference image to understand the current village layout, existing plants, and available space
+- Place the plant at a reasonable size that doesn't dominate the scene
+- Position the plant in an orderly location within the farm/dirt area that doesn't overlap existing elements
+- Maintain the same art style and visual quality as both reference images
+- The plant should be INSIDE the farm/dirt area, not on paths or buildings
+- Ensure the plant fits naturally into the existing village composition
+
+Both reference images show the exact visual context needed for accurate plant placement.`;
   }
 }
