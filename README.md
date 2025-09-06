@@ -1,3 +1,23 @@
+# Welcome Hackathon Judges! 👋
+
+Thank you for taking the time to evaluate VillageOS! I'm excited to share my cozy collaborative farming simulator with you.
+
+### Get Started
+Join the Discord server to interact with the bot: [https://discord.gg/PzzvE8KK](https://discord.gg/PzzvE8KK)
+
+### Quick Commands to Try
+- `/village me description:"Custom appearance"` - Customize your character
+- `/village create name:"My Farm"` - Create your own village (one per server)
+- `/village show` - View your village status
+- `/village plant <x> <y>` - Plant crops at coordinates
+- `/village water <x> <y>` - Water your crops
+
+### The Secret Sauce
+1. The underlying architecture is platform agnostic - meaning users could work on their farm together in a text group chat! This gaming platform can meet users on whatever platform they are currently using.
+2. We are entering into a truly new era of interactive experiences. I've been an indie game dev for half a decade and this is the first time where a user can grow a fictional plant they made up in their mind one minute prior to seeing it live.
+
+---
+
 # VillageOS - Collaborative Farming Simulator
 
 A collaborative farming simulator framework for group text chats, built with TypeScript, Node.js, React, and Prisma.
