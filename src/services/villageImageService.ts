@@ -47,7 +47,7 @@ export class VillageImageService {
 User wants their village to look like: "${description}".
 
 The village is currently an EMPTY PLOT OF LAND.
-The user interacts with the village via a 2D grid, so make sure to keep in mind that we are trying to visualize a PLOT of land.
+The central area is an empty farm, currently a dirt patch suitable for growing crops.
 
 Create an optimized prompt for Gemini AI image generation that will produce a beautiful, atmospheric village scene suitable for a collaborative farming game.
 
@@ -116,8 +116,6 @@ This will serve as the village's visual representation in the game.`;
       // When we have an existing village baseline, focus ONLY on adding members
       return `Take the existing village scene from the first reference image and add ${memberCount} villagers to it.
 
-${hasBaselines ? 'Use the subsequent reference images to represent the villagers\' appearances.' : 'Create distinct villager appearances for each member.'}
-
 CRITICAL INSTRUCTIONS:
 - DO NOT add, remove, or modify any existing buildings, crops, paths, or landscape features
 - DO NOT change the village layout or composition in any way
@@ -150,5 +148,48 @@ Composition:
 
 This will serve as the village's visual representation in the game showing all current members.`;
     }
+  }
+
+  async generatePlantBaseline(plantDescription: string): Promise<string> {
+    const prompt = this.createPlantBaselinePrompt(plantDescription);
+
+    const tempFileInfo = await this.mediaGenerationService.generateMedia({
+      prompt,
+      type: 'image',
+      jobType: 'OBJECT_BASELINE'
+    });
+
+    return tempFileInfo.url;
+  }
+
+  private createPlantBaselinePrompt(plantDescription: string): string {
+    return `A detailed plant: ${plantDescription}.
+Show as a small seedling just sprouted from the ground.
+Pixel art style, clean background, farming game aesthetic.
+Single plant, centered, no other objects. Generate exactly what the user described.`;
+  }
+
+  async updateVillageBaseline(
+    villageName: string,
+    currentVillageBaselineUrl: string,
+    plantBaselineUrl: string,
+    gridX: number,
+    gridY: number
+  ): Promise<string> {
+    const prompt = this.createVillageBaselineUpdatePrompt(villageName, gridX, gridY);
+
+    const tempFileInfo = await this.mediaGenerationService.generateMedia({
+      prompt,
+      type: 'image',
+      jobType: 'VILLAGE_BASELINE',
+      baselineImages: [currentVillageBaselineUrl, plantBaselineUrl]
+    });
+
+    return tempFileInfo.url;
+  }
+
+  private createVillageBaselineUpdatePrompt(villageName: string, gridX: number, gridY: number): string {
+    return `Update the existing landscape by adding a single instance of the plant in an appropriate area in the farm. `
+        + 'The plant should be at a reasonable size to allow and not take up too much space.';
   }
 }

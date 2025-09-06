@@ -212,6 +212,24 @@ export class VillageRepository {
     });
   }
 
+  async updateObjectBaseline(objectId: string, baselineUrl: string): Promise<void> {
+    await this.prisma.villageObject.update({
+      where: { id: objectId },
+      data: { baselineUrl }
+    });
+  }
+
+  async findPlantAtPosition(villageId: string, gridX: number, gridY: number): Promise<VillageObject | null> {
+    return this.prisma.villageObject.findFirst({
+      where: {
+        villageId,
+        gridX,
+        gridY,
+        objectType: 'PLANT'
+      }
+    });
+  }
+
   async deleteVillage(villageId: string): Promise<void> {
     // Verify village exists before deletion
     const village = await this.prisma.village.findUnique({

@@ -134,13 +134,89 @@ export class CommandProcessorService {
 
   private async handlePlantCommand(command: CommandInput): Promise<CommandResult> {
     // Validate required services
-    if (!this.villageRepository || !this.userRepository) {
+    if (!this.villageRepository || !this.userRepository || !this.villageImageService) {
       return {
         success: false,
-        error: {
-          type: 'INTERNAL',
-          message: 'Required services not available'
-        }
+        error: { type: 'INTERNAL', message: 'Required services not available' }
+      };
+    }
+
+    // Extract plant description from command args
+    const plantDescription = command.args && typeof command.args === 'object' && 'description' in command.args
+      ? (command.args as any).description
+      : undefined;
+
+    if (!plantDescription) {
+      return {
+        success: false,
+        error: { type: 'VALIDATION', message: 'Please specify what you want to plant.' }
+      };
+    }
+
+    try {
+      // Check if village exists
+      const village = await this.villageRepository.findByGuildId(command.serverId);
+      if (!village) {
+        return {
+          success: false,
+          error: { type: 'VALIDATION', message: 'Village not found. Please create a village first.' }
+        };
+      }
+
+      // Get or create user
+      let user = await this.userRepository.findByDiscordId(command.sourceUserId);
+      if (!user) {
+        user = await this.userRepository.createUser(command.sourceUserId);
+      }
+
+      // Find available position automatically
+      const position = await this.villageRepository.findAvailablePosition(village.id);
+      if (!position) {
+        return {
+          success: false,
+          error: { type: 'VALIDATION', message: 'No available space in your village!' }
+        };
+      }
+
+      // Create plant object first
+      const plant = await this.villageRepository.addObject(
+        village.id,
+        user.id,
+        VillageObjectType.PLANT,
+        plantDescription,
+        undefined,
+        position.x,
+        position.y
+      );
+
+      return {
+        success: true,
+        message: `🌱 You planted ${plantDescription} at position (${position.x}, ${position.y})! Generating your updated village...`,
+        data: { plant, village },
+        asyncWork: this.generateTwoStepPlantBaseline(village, plant, plantDescription, position.x, position.y)
+      };
+
+    } catch (error) {
+      logger.error({
+        event: 'plant_command_error',
+        error: error instanceof Error ? error.message : String(error),
+        userId: command.sourceUserId,
+        serverId: command.serverId
+      });
+
+      return {
+        success: false,
+        error: { type: 'INTERNAL', message: 'Failed to plant crop. Please try again.' }
+      };
+    }
+  }
+
+  private async handleWaterCommand(command: CommandInput): Promise<CommandResult> {
+    // Validate required services
+    if (!this.villageRepository) {
+      return {
+        success: false,
+        error: { type: 'INTERNAL', message: 'Required services not available' }
       };
     }
 
@@ -156,20 +232,14 @@ export class CommandProcessorService {
     if (x === undefined || y === undefined) {
       return {
         success: false,
-        error: {
-          type: 'VALIDATION',
-          message: 'Please specify both x and y coordinates for planting.'
-        }
+        error: { type: 'VALIDATION', message: 'Please specify both x and y coordinates for watering.' }
       };
     }
 
     if (x < 0 || x > 9 || y < 0 || y > 9) {
       return {
         success: false,
-        error: {
-          type: 'VALIDATION',
-          message: 'Coordinates must be between 0 and 9.'
-        }
+        error: { type: 'VALIDATION', message: 'Coordinates must be between 0 and 9.' }
       };
     }
 
@@ -179,76 +249,42 @@ export class CommandProcessorService {
       if (!village) {
         return {
           success: false,
-          error: {
-            type: 'VALIDATION',
-            message: 'Village not found. Please create a village first with `/village create`.'
-          }
+          error: { type: 'VALIDATION', message: 'Village not found. Please create a village first.' }
         };
       }
 
-      // Get or create user
-      let user = await this.userRepository.findByDiscordId(command.sourceUserId);
-      if (!user) {
-        user = await this.userRepository.createUser(command.sourceUserId);
+      // Find plant at the specified coordinates
+      const plant = await this.villageRepository.findPlantAtPosition(village.id, x, y);
+
+      if (!plant) {
+        return {
+          success: false,
+          error: { type: 'VALIDATION', message: `No plant found at position (${x}, ${y}).` }
+        };
       }
 
-      // Simple crop selection for hackathon
-      const cropTypes = ['Tomato', 'Wheat', 'Corn', 'Carrot', 'Potato', 'Lettuce', 'Beans', 'Pumpkin'];
-      const selectedCrop = cropTypes[Math.floor(Math.random() * cropTypes.length)];
-
-      // Plant the crop using existing repository method
-      const plant = await this.villageRepository.addObject(
-        village.id,
-        user.id,
-        VillageObjectType.PLANT,
-        selectedCrop,
-        undefined, // enhancedDescription
-        x,
-        y
-      );
+      // Water the plant
+      await this.villageRepository.waterPlant(plant.id);
 
       return {
         success: true,
-        message: `🌱 You planted ${selectedCrop} at (${x}, ${y})! It will take about 72 hours to fully grow.`,
-        data: { plant, village }
+        message: `💧 You watered the plant at (${x}, ${y})! It will grow nicely now.`
       };
 
     } catch (error) {
       logger.error({
-        event: 'plant_command_error',
+        event: 'water_command_error',
         error: error instanceof Error ? error.message : String(error),
         userId: command.sourceUserId,
         serverId: command.serverId,
         coordinates: { x, y }
       });
 
-      // Handle position already occupied error
-      if (error instanceof Error && error.message.includes('unique constraint')) {
-        return {
-          success: false,
-          error: {
-            type: 'VALIDATION',
-            message: `Position (${x}, ${y}) is already occupied! Choose a different location.`
-          }
-        };
-      }
-
       return {
         success: false,
-        error: {
-          type: 'INTERNAL',
-          message: 'Failed to plant crop. Please try again.'
-        }
+        error: { type: 'INTERNAL', message: 'Failed to water plant. Please try again.' }
       };
     }
-  }
-  private async handleWaterCommand(command: CommandInput): Promise<CommandResult> {
-    return {
-      success: true,
-      message: '💧 You watered your crops! They\'re growing nicely.',
-      data: null,
-      asyncWork: undefined
-    };
   }
   private async handleBuildCommand(command: CommandInput): Promise<CommandResult> {
     return {
@@ -426,6 +462,62 @@ export class CommandProcessorService {
       console.error('Failed to generate village show image:', error);
       return {
         message: `❌ Failed to generate village image. The village information is still available above.`
+      };
+    }
+  }
+
+  private async generateTwoStepPlantBaseline(
+    village: any,
+    plant: any,
+    plantDescription: string,
+    gridX: number,
+    gridY: number
+  ): Promise<AsyncWorkResult> {
+    try {
+      if (!this.villageImageService || !this.villageRepository) {
+        throw new Error('Required services not available');
+      }
+
+      // Step 1: Generate plant baseline
+      const plantBaselineUrl = await this.villageImageService.generatePlantBaseline(plantDescription);
+
+      // Update plant object with baseline URL
+      await this.villageRepository.updateObjectBaseline(plant.id, plantBaselineUrl);
+
+      // Step 2: Update village baseline with new plant
+      const villageName = village.name || `Village ${village.guildId.slice(-4)}`;
+      const currentVillageBaseline = village.baselineUrl;
+
+      if (!currentVillageBaseline) {
+        throw new Error('Village has no baseline image to update');
+      }
+
+      const updatedVillageBaselineUrl = await this.villageImageService.updateVillageBaseline(
+        villageName,
+        currentVillageBaseline,
+        plantBaselineUrl,
+        gridX,
+        gridY
+      );
+
+      // Step 3: Save new village baseline
+      await this.villageRepository.updateVillageBaselineByGuildId(village.guildId, updatedVillageBaselineUrl);
+
+      return {
+        mediaData: {
+          type: 'image',
+          url: updatedVillageBaselineUrl,
+          filename: `village-${village.id}-updated.png`,
+          mimeType: 'image/png',
+          caption: `${villageName} - Updated with ${plantDescription} at (${gridX}, ${gridY})`
+        },
+        message: `🏘️ Your village has been updated with the new ${plantDescription}!`
+      };
+
+    } catch (error) {
+      console.error('Failed to generate two-step plant baseline:', error);
+      return {
+        message: `✅ Plant added successfully! The village image will be updated shortly.`
       };
     }
   }

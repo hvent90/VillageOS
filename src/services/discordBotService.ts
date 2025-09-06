@@ -1,8 +1,9 @@
-import { Client, GatewayIntentBits, ChatInputCommandInteraction, MessageFlags, EmbedBuilder, GuildMember } from 'discord.js';
+import { Client, GatewayIntentBits, ChatInputCommandInteraction, MessageFlags, EmbedBuilder } from 'discord.js';
 import { CommandProcessorService } from './commandProcessorService';
 import { CommandRegistrationService } from './commandRegistrationService';
 import { DiscordPlatformAdapter } from '../adapters/discordPlatformAdapter';
-import { WelcomeService } from './welcomeService';
+// TODO: Re-enable when GuildMembers intent is enabled in Discord Developer Portal
+// import { WelcomeService } from './welcomeService';
 import { CommandInput } from '../types/commands';
 import { CommandName, AsyncWorkResult } from '../types/commandResults';
 
@@ -10,11 +11,12 @@ export class DiscordBotService {
   private client: Client;
   private commandProcessor!: CommandProcessorService;
   private commandRegistrationService!: CommandRegistrationService;
-  private welcomeService!: WelcomeService;
+  // TODO: Re-enable when GuildMembers intent is enabled in Discord Developer Portal
+  // private welcomeService!: WelcomeService;
 
   constructor(private token: string) {
     this.client = new Client({
-      intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMembers]
+      intents: [GatewayIntentBits.Guilds] // Remove GuildMembers until enabled in portal
     });
   }
 
@@ -30,9 +32,10 @@ export class DiscordBotService {
       }
     });
 
-    this.client.on('guildMemberAdd', async (member) => {
-      await this.handleGuildMemberAdd(member);
-    });
+    // TODO: Re-enable when GuildMembers intent is enabled in Discord Developer Portal
+    // this.client.on('guildMemberAdd', async (member) => {
+    //   await this.handleGuildMemberAdd(member);
+    // });
   }
 
   private async handleSlashCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -108,7 +111,7 @@ export class DiscordBotService {
      if (interaction.options.getInteger('y') !== null) {
        args.y = interaction.options.getInteger('y');
      }
-     if (interaction.options.getString('description')) {
+     if (interaction.options.getString('description') || interaction.options.getString('crop')) {
        args.description = interaction.options.getString('description');
      }
 
@@ -123,9 +126,10 @@ export class DiscordBotService {
     this.commandRegistrationService = service;
   }
 
-  setWelcomeService(service: WelcomeService): void {
-    this.welcomeService = service;
-  }
+  // TODO: Re-enable when GuildMembers intent is enabled in Discord Developer Portal
+  // setWelcomeService(service: WelcomeService): void {
+  //   this.welcomeService = service;
+  // }
 
   async registerSlashCommands(): Promise<void> {
     await this.commandRegistrationService.registerCommands();
@@ -159,19 +163,20 @@ export class DiscordBotService {
     });
   }
 
-  private async handleGuildMemberAdd(member: GuildMember): Promise<void> {
-    try {
-      const welcomeChannel = this.welcomeService.findWelcomeChannel(member.guild);
-      if (!welcomeChannel) return;
-
-      const canSend = await this.welcomeService.canSendWelcomeMessage(welcomeChannel, this.client);
-      if (!canSend) return;
-
-      const embed = this.welcomeService.createWelcomeEmbed(member);
-      // ${member.user} automatically formats as @ mention in Discord
-      await welcomeChannel.send({ content: `${member.user}`, embeds: [embed] });
-    } catch (error) {
-      console.error('Welcome message failed:', error);
-    }
-  }
+  // TODO: Re-enable when GuildMembers intent is enabled in Discord Developer Portal
+  // private async handleGuildMemberAdd(member: GuildMember): Promise<void> {
+  //   try {
+  //     const welcomeChannel = this.welcomeService.findWelcomeChannel(member.guild);
+  //     if (!welcomeChannel) return;
+  //
+  //     const canSend = await this.welcomeService.canSendWelcomeMessage(welcomeChannel, this.client);
+  //     if (!canSend) return;
+  //
+  //     const embed = this.welcomeService.createWelcomeEmbed(member);
+  //     // ${member.user} automatically formats as @ mention in Discord
+  //     await welcomeChannel.send({ content: `${member.user}`, embeds: [embed] });
+  //   } catch (error) {
+  //     console.error('Welcome message failed:', error);
+  //   }
+  // }
 }

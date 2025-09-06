@@ -33,7 +33,7 @@ export const slashCommands = [
         .setName('plant')
         .setDescription('🌱 Plant crops in your village')
         .addStringOption(option =>
-          option.setName('crop')
+          option.setName('description')
             .setDescription('What do you want to plant? (e.g., "tomatoes", "wheat", "magical sunflowers")')
             .setRequired(true)
             .setMinLength(2)

@@ -16,7 +16,8 @@ import { GameConfigurationService } from './services/gameConfigurationService';
 import { GameConfigurationRepository } from './repositories/gameConfigurationRepository';
 import { LLMPromptService } from './services/llmPromptService';
 import { VillageImageService } from './services/villageImageService';
-import { WelcomeService } from './services/welcomeService';
+// TODO: Re-enable when GuildMembers intent is enabled in Discord Developer Portal
+// import { WelcomeService } from './services/welcomeService';
 
 import logger from './config/logger';
 
@@ -76,8 +77,9 @@ async function main() {
     const schedulerService = new SchedulerService(queueService);
     schedulerService.startJobs();
 
+    // TODO: Re-enable when GuildMembers intent is enabled in Discord Developer Portal
     // Initialize welcome service
-    const welcomeService = new WelcomeService();
+    // const welcomeService = new WelcomeService();
 
     // Initialize Discord bot service
     const discordBotService = new DiscordBotService(envConfig.discordBotToken);
@@ -109,7 +111,8 @@ async function main() {
     // Set up Discord bot
     discordBotService.setCommandRegistrationService(commandRegistrationService);
     discordBotService.setCommandProcessor(commandProcessorService);
-    discordBotService.setWelcomeService(welcomeService);
+    // TODO: Re-enable when GuildMembers intent is enabled in Discord Developer Portal
+    // discordBotService.setWelcomeService(welcomeService);
 
     // Start Discord bot
     await discordBotService.listen();
