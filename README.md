@@ -31,6 +31,7 @@ Here are some visual examples of VillageOS in action:
 <img src="docs/lavatown.png" alt="Lavatown" height="400"/>
 <img src="docs/lavatown-2.png" alt="Lavatown 2" height="400"/>
 <img src="docs/lavatown-3.png" alt="Lavatown 3" height="400"/>
+<img src="docs/lavatown-4.png" alt="Lavatown 4" height="400"/>
 
 ---
 
