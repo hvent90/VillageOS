@@ -1,4 +1,4 @@
-# Welcome Hackathon Judges! 👋
+# Welcome Hackathon Judges!
 
 Thank you for taking the time to evaluate VillageOS! I'm excited to share my cozy collaborative farming simulator with you.
 
@@ -21,6 +21,9 @@ Join the Discord server to interact with the bot: [https://discord.gg/PzzvE8KK](
 # VillageOS - Collaborative Farming Simulator
 
 A collaborative farming simulator framework for group text chats, built with TypeScript, Node.js, React, and Prisma.
+
+Add it to your Discord sever: https://discord.com/oauth2/authorize?client_id=1413956635533250580&permissions=2147813376&integration_type=0&scope=applications.commands+bot
+
 
 ## Features
 

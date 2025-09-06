@@ -16,6 +16,7 @@ import { GameConfigurationService } from './services/gameConfigurationService';
 import { GameConfigurationRepository } from './repositories/gameConfigurationRepository';
 import { LLMPromptService } from './services/llmPromptService';
 import { VillageImageService } from './services/villageImageService';
+import { WelcomeService } from './services/welcomeService';
 
 import logger from './config/logger';
 
@@ -75,6 +76,9 @@ async function main() {
     const schedulerService = new SchedulerService(queueService);
     schedulerService.startJobs();
 
+    // Initialize welcome service
+    const welcomeService = new WelcomeService();
+
     // Initialize Discord bot service
     const discordBotService = new DiscordBotService(envConfig.discordBotToken);
 
@@ -105,6 +109,7 @@ async function main() {
     // Set up Discord bot
     discordBotService.setCommandRegistrationService(commandRegistrationService);
     discordBotService.setCommandProcessor(commandProcessorService);
+    discordBotService.setWelcomeService(welcomeService);
 
     // Start Discord bot
     await discordBotService.listen();

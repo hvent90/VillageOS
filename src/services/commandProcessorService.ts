@@ -8,6 +8,7 @@ import { LLMPromptService } from './llmPromptService';
 import { VillageImageService } from './villageImageService';
 import { CommandInput } from '../types/commands';
 import { CommandResult, CommandError, CommandName, AsyncWorkResult, MediaData } from '../types/commandResults';
+import { VillageObjectType } from '@prisma/client';
 import { EnvironmentConfig } from '../config/environment';
 import logger from '../config/logger';
 
@@ -132,29 +133,113 @@ export class CommandProcessorService {
   }
 
   private async handlePlantCommand(command: CommandInput): Promise<CommandResult> {
-    // perform validation
+    // Validate required services
+    if (!this.villageRepository || !this.userRepository) {
+      return {
+        success: false,
+        error: {
+          type: 'INTERNAL',
+          message: 'Required services not available'
+        }
+      };
+    }
+
+    // Extract coordinates from Discord args
+    const x = command.args && typeof command.args === 'object' && 'x' in command.args
+      ? (command.args as any).x
+      : undefined;
+    const y = command.args && typeof command.args === 'object' && 'y' in command.args
+      ? (command.args as any).y
+      : undefined;
+
+    // Validate coordinates
+    if (x === undefined || y === undefined) {
+      return {
+        success: false,
+        error: {
+          type: 'VALIDATION',
+          message: 'Please specify both x and y coordinates for planting.'
+        }
+      };
+    }
+
+    if (x < 0 || x > 9 || y < 0 || y > 9) {
+      return {
+        success: false,
+        error: {
+          type: 'VALIDATION',
+          message: 'Coordinates must be between 0 and 9.'
+        }
+      };
+    }
 
     try {
-      // do game logic
-
-      return {
-        success: true,
-        message: '🌱 You planted a seed! Your village grows stronger.',
-        data: null,
-        asyncWork: undefined
-      };
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('foo')) {
+      // Check if village exists
+      const village = await this.villageRepository.findByGuildId(command.serverId);
+      if (!village) {
         return {
           success: false,
           error: {
             type: 'VALIDATION',
-            message: 'foo'
+            message: 'Village not found. Please create a village first with `/village create`.'
           }
         };
-      } else {
-        throw error;
       }
+
+      // Get or create user
+      let user = await this.userRepository.findByDiscordId(command.sourceUserId);
+      if (!user) {
+        user = await this.userRepository.createUser(command.sourceUserId);
+      }
+
+      // Simple crop selection for hackathon
+      const cropTypes = ['Tomato', 'Wheat', 'Corn', 'Carrot', 'Potato', 'Lettuce', 'Beans', 'Pumpkin'];
+      const selectedCrop = cropTypes[Math.floor(Math.random() * cropTypes.length)];
+
+      // Plant the crop using existing repository method
+      const plant = await this.villageRepository.addObject(
+        village.id,
+        user.id,
+        VillageObjectType.PLANT,
+        selectedCrop,
+        undefined, // enhancedDescription
+        x,
+        y
+      );
+
+      return {
+        success: true,
+        message: `🌱 You planted ${selectedCrop} at (${x}, ${y})! It will take about 72 hours to fully grow.`,
+        data: { plant, village }
+      };
+
+    } catch (error) {
+      logger.error({
+        event: 'plant_command_error',
+        error: error instanceof Error ? error.message : String(error),
+        userId: command.sourceUserId,
+        serverId: command.serverId,
+        coordinates: { x, y }
+      });
+
+      // Handle position already occupied error
+      if (error instanceof Error && error.message.includes('unique constraint')) {
+        return {
+          success: false,
+          error: {
+            type: 'VALIDATION',
+            message: `Position (${x}, ${y}) is already occupied! Choose a different location.`
+          }
+        };
+      }
+
+      return {
+        success: false,
+        error: {
+          type: 'INTERNAL',
+          message: 'Failed to plant crop. Please try again.'
+        }
+      };
     }
   }
   private async handleWaterCommand(command: CommandInput): Promise<CommandResult> {
