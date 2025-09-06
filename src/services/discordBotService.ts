@@ -131,8 +131,8 @@ export class DiscordBotService {
         .setTimestamp();
 
       await interaction.followUp({
-        embeds: [embed],
-        flags: MessageFlags.Ephemeral
+        embeds: [embed]
+        // No ephemeral flag - image visible to everyone
       });
     } else if (asyncResult.message) {
       await interaction.followUp({

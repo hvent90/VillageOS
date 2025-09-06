@@ -117,10 +117,35 @@ async function testConfigurationInitialization() {
   }
 }
 
+// Test Discord image visibility (manual testing framework)
+async function testDiscordImageVisibility() {
+  console.log('\nTesting Discord Image Visibility...\n');
+
+  console.log('Discord Image Visibility Test Cases:');
+  console.log('=====================================');
+  console.log('');
+  console.log('Manual Testing Steps:');
+  console.log('1. Run /village create command and verify image is visible to all channel members');
+  console.log('2. Run /village show command and verify image is visible to all channel members');
+  console.log('3. Run /village me command and verify character image is visible to all channel members');
+  console.log('4. Test text-only commands (like /village status) remain ephemeral');
+  console.log('5. Test error messages remain ephemeral');
+  console.log('');
+  console.log('Expected Results:');
+  console.log('- ✅ Images should appear in channel history for all members');
+  console.log('- ✅ Multiple users should be able to see each other\'s generated images');
+  console.log('- ✅ Text-only responses should only be visible to the requesting user');
+  console.log('- ✅ Error messages should only be visible to the requesting user');
+  console.log('');
+  console.log('Note: These tests require manual execution in a Discord environment');
+  console.log('with the bot deployed and multiple test users available.');
+}
+
 // Run the tests
 async function runAllTests() {
   await testConfigurationInitialization();
   await testConfigurationEndpoints();
+  await testDiscordImageVisibility();
 }
 
 runAllTests();

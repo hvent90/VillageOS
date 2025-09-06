@@ -26,7 +26,12 @@ export class DiscordPlatformAdapter implements PlatformAdapter {
       if (this.interaction.deferred) {
         await this.interaction.editReply(options);
       } else {
-        await this.interaction.reply({...options, flags: MessageFlags.Ephemeral});
+        // Only add ephemeral flag for text-only messages, not image messages
+        if (result.mediaData) {
+          await this.interaction.reply(options); // No ephemeral flag for images - visible to everyone
+        } else {
+          await this.interaction.reply({...options, flags: MessageFlags.Ephemeral}); // Ephemeral for text-only
+        }
       }
     }
 
