@@ -3,12 +3,13 @@ import { GoogleGenAI } from '@google/genai';
 import zlib from 'zlib';
 
 export interface MediaGenerationRequest {
-   prompt: string;
-   type: 'image' | 'video' | 'audio';
-   style?: string;
-   format?: string;
-   baselineImageUrl?: string;  // New optional field
-   jobType?: string;  // New optional field for job type
+    prompt: string;
+    type: 'image' | 'video' | 'audio';
+    style?: string;
+    format?: string;
+    baselineImageUrl?: string;  // Keep for backward compatibility
+    baselineImages?: string[];  // NEW: Support multiple baseline images
+    jobType?: string;  // New optional field for job type
 }
 
 export class MediaGenerationService {
@@ -63,51 +64,87 @@ Composition: Head and shoulders view, centered, with clean background.`;
     try {
       console.log(`Generating image for prompt: "${request.prompt}"`);
 
-      let contents: any[] = [{ text: request.prompt }];
+       let contents: any[] = [{ text: request.prompt }];
 
-      // Include baseline image if available
-      if (request.baselineImageUrl) {
-        try {
-          const response = await fetch(request.baselineImageUrl);
-          const buffer = await response.arrayBuffer();
-          const base64Image = Buffer.from(buffer).toString('base64');
+       // Handle multiple baseline images
+       if (request.baselineImages && request.baselineImages.length > 0) {
+         const validBaselines = [];
 
-          // Enhanced prompt following Google's guidelines for consistency with reference image
-          const enhancedPrompt = `${request.prompt}
-
-          Scene composition:
-          - The village object must match EXACTLY the appearance, colors, and patterns shown in the reference image
-          - Maintain the same art style and visual consistency
-          - Place the village object in the center of the composition performing the action
-          - Use appropriate props and environment for the action (watering can for watering, tools for harvesting, etc.)
-          - Keep the same lighting quality and color temperature as the reference
-          - The village object's appearance should reflect the action while preserving all unique visual features
-
-          Critical: This is the same individual village object, not a similar one. All distinctive markings, colors, and features must be identical.`;
-
-          contents = [
-            { text: enhancedPrompt },
-            {
-              inlineData: {
-                mimeType: "image/png",
-                data: base64Image,
-              },
-            },
-          ];
-        } catch (error) {
-          console.error('Failed to load baseline image, proceeding without reference:', error);
-          // Fall back to enhanced text prompt
-          request.prompt = this.enhancePromptWithoutBaseline(request.prompt);
-        }
-      } else {
-         // If no baseline, use enhanced text prompt with detailed description
-         request.prompt = this.enhancePromptWithoutBaseline(request.prompt);
-
-         // Apply additional enhancement for character customization
-         if (request.jobType === 'BASELINE') {
-           request.prompt = this.enhanceMePrompt(request.prompt);
+         for (const baselineUrl of request.baselineImages) {
+           try {
+             const response = await fetch(baselineUrl);
+             const buffer = await response.arrayBuffer();
+             const base64Image = Buffer.from(buffer).toString('base64');
+             validBaselines.push(base64Image);
+           } catch (error) {
+             console.error(`Failed to load baseline image ${baselineUrl}:`, error);
+           }
          }
-       }
+
+         if (validBaselines.length > 0) {
+           // Enhanced prompt for multiple references
+           const enhancedPrompt = `${request.prompt}
+
+Reference Guidelines:
+- Use the provided reference images to create consistent character appearances
+- Each reference image represents a different villager in the scene
+- Maintain the unique visual features from each reference image
+- Position villagers naturally throughout the village scene
+- Ensure visual consistency and cohesion across all characters`;
+
+           contents = [
+             { text: enhancedPrompt },
+             ...validBaselines.map(base64Image => ({
+               inlineData: {
+                 mimeType: "image/png",
+                 data: base64Image,
+               },
+             }))
+           ];
+         }
+       } else if (request.baselineImageUrl) {
+         // Existing single baseline logic...
+         try {
+           const response = await fetch(request.baselineImageUrl);
+           const buffer = await response.arrayBuffer();
+           const base64Image = Buffer.from(buffer).toString('base64');
+
+           // Enhanced prompt following Google's guidelines for consistency with reference image
+           const enhancedPrompt = `${request.prompt}
+
+           Scene composition:
+           - The village object must match EXACTLY the appearance, colors, and patterns shown in the reference image
+           - Maintain the same art style and visual consistency
+           - Place the village object in the center of the composition performing the action
+           - Use appropriate props and environment for the action (watering can for watering, tools for harvesting, etc.)
+           - Keep the same lighting quality and color temperature as the reference
+           - The village object's appearance should reflect the action while preserving all unique visual features
+
+           Critical: This is the same individual village object, not a similar one. All distinctive markings, colors, and features must be identical.`;
+
+           contents = [
+             { text: enhancedPrompt },
+             {
+               inlineData: {
+                 mimeType: "image/png",
+                 data: base64Image,
+               },
+             },
+           ];
+         } catch (error) {
+           console.error('Failed to load baseline image, proceeding without reference:', error);
+           // Fall back to enhanced text prompt
+           request.prompt = this.enhancePromptWithoutBaseline(request.prompt);
+         }
+       } else {
+          // If no baseline, use enhanced text prompt with detailed description
+          request.prompt = this.enhancePromptWithoutBaseline(request.prompt);
+
+          // Apply additional enhancement for character customization
+          if (request.jobType === 'BASELINE') {
+            request.prompt = this.enhanceMePrompt(request.prompt);
+          }
+        }
 
       const response = await this.ai.models.generateContent({
         model: "gemini-2.5-flash-image-preview",

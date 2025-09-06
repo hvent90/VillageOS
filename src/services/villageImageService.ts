@@ -73,4 +73,82 @@ Visual Details:
 
 This will serve as the village's visual representation in the game.`;
   }
+
+  async generateVillageWithMembersImage(
+    villageName: string,
+    memberBaselines: Array<{userId: string, baselineUrl?: string, displayName?: string}>,
+    villageBaselineUrl?: string
+  ): Promise<string> {
+    // Create composite prompt with village scene and member descriptions
+    const prompt = this.createVillageWithMembersPrompt(villageName, memberBaselines, villageBaselineUrl);
+
+    // Prepare baseline images array for media generation
+    const baselineImages = memberBaselines
+      .filter(member => member.baselineUrl)
+      .map(member => member.baselineUrl!);
+
+    // Add village baseline as primary reference if available
+    if (villageBaselineUrl) {
+      baselineImages.unshift(villageBaselineUrl);
+    }
+
+    // Generate image with multiple references
+    const tempFileInfo = await this.mediaGenerationService.generateMedia({
+      prompt: prompt,
+      type: 'image',
+      jobType: 'VILLAGE_BASELINE',
+      baselineImages: baselineImages // New field to support multiple baselines
+    });
+
+    return tempFileInfo.url;
+  }
+
+  private createVillageWithMembersPrompt(
+    villageName: string,
+    members: Array<{userId: string, baselineUrl?: string, displayName?: string}>,
+    villageBaselineUrl?: string
+  ): string {
+    const memberCount = members.length;
+    const hasBaselines = members.some(m => m.baselineUrl);
+    const hasVillageBaseline = !!villageBaselineUrl;
+
+    if (hasVillageBaseline) {
+      // When we have an existing village baseline, focus ONLY on adding members
+      return `Take the existing village scene from the first reference image and add ${memberCount} villagers to it.
+
+${hasBaselines ? 'Use the subsequent reference images to represent the villagers\' appearances.' : 'Create distinct villager appearances for each member.'}
+
+CRITICAL INSTRUCTIONS:
+- DO NOT add, remove, or modify any existing buildings, crops, paths, or landscape features
+- DO NOT change the village layout or composition in any way
+- ONLY add the villager characters to the existing scene
+- Position villagers naturally within the existing village environment
+- Maintain the exact same visual elements, lighting, and atmosphere as the original
+- Keep the same camera angle and composition
+
+The villagers should be engaged in farming activities appropriate to the existing village scene.`;
+    } else {
+      // Original prompt for villages without baseline
+      return `Create a farming village scene for "${villageName}" in a collaborative farming game.
+
+The village has ${memberCount} members who should be shown as villagers engaged in farming activities.
+${hasBaselines ? 'Use the provided reference images to represent the villagers\' appearances.' : 'Each villager should have a distinct appearance and personality.'}
+
+Visual elements:
+- Charming countryside village with rolling green hills
+- Mix of traditional farmhouses and agricultural buildings
+- Lush green fields and vegetable gardens
+- Dirt paths winding between buildings
+- Clear blue sky with fluffy white clouds
+- Warm, inviting atmosphere perfect for a farming community
+
+Composition:
+- Wide landscape view showing the entire village
+- Villagers positioned naturally throughout the scene
+- Some working in fields, others near buildings
+- Centered composition with village as main focal point
+
+This will serve as the village's visual representation in the game showing all current members.`;
+    }
+  }
 }

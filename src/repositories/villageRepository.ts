@@ -40,6 +40,32 @@ export class VillageRepository {
     });
   }
 
+  async getVillageMembersWithBaselines(villageId: string): Promise<Array<{
+    userId: string;
+    baselineUrl?: string;
+    displayName?: string;
+  }>> {
+    const members = await this.prisma.villageMember.findMany({
+      where: { villageId },
+      include: {
+        user: {
+          select: {
+            discordId: true,
+            baselineUrl: true,
+            displayName: true
+          }
+        }
+      },
+      orderBy: { joinedAt: 'asc' }
+    });
+
+    return members.map(member => ({
+      userId: member.userId,
+      baselineUrl: member.user.baselineUrl || undefined,
+      displayName: member.user.displayName || member.user.discordId
+    }));
+  }
+
   async findAvailablePosition(villageId: string): Promise<{ x: number, y: number } | null> {
     const village = await this.prisma.village.findUnique({
       where: { id: villageId },

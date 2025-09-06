@@ -1,9 +1,9 @@
-import { Client, GatewayIntentBits, ChatInputCommandInteraction, MessageFlags } from 'discord.js';
+import { Client, GatewayIntentBits, ChatInputCommandInteraction, MessageFlags, EmbedBuilder } from 'discord.js';
 import { CommandProcessorService } from './commandProcessorService';
 import { CommandRegistrationService } from './commandRegistrationService';
 import { DiscordPlatformAdapter } from '../adapters/discordPlatformAdapter';
 import { CommandInput } from '../types/commands';
-import { CommandName } from '../types/commandResults';
+import { CommandName, AsyncWorkResult } from '../types/commandResults';
 
 export class DiscordBotService {
   private client: Client;
@@ -42,6 +42,17 @@ export class DiscordBotService {
     // Send the result using the adapter
     if (result.success) {
       await adapter.sendResult(interaction.channelId, result);
+
+      // Process async work if present
+      if (result.asyncWork) {
+        try {
+          const asyncResult = await result.asyncWork;
+          await this.sendAsyncResult(interaction, asyncResult);
+        } catch (error) {
+          console.error('Async work failed:', error);
+          await this.sendAsyncError(interaction, 'Failed to complete background task');
+        }
+      }
     } else if (result.error) {
       await adapter.sendError(interaction.channelId, result.error);
     }
@@ -108,5 +119,33 @@ export class DiscordBotService {
 
   async registerSlashCommands(): Promise<void> {
     await this.commandRegistrationService.registerCommands();
+  }
+
+  private async sendAsyncResult(interaction: ChatInputCommandInteraction, asyncResult: AsyncWorkResult): Promise<void> {
+    if (asyncResult.mediaData) {
+      const embed = new EmbedBuilder()
+        .setTitle('🏘️ Village Image Generated!')
+        .setDescription(asyncResult.message || 'Here\'s your village!')
+        .setImage(asyncResult.mediaData.url)
+        .setColor(0x00ff00)
+        .setTimestamp();
+
+      await interaction.followUp({
+        embeds: [embed],
+        flags: MessageFlags.Ephemeral
+      });
+    } else if (asyncResult.message) {
+      await interaction.followUp({
+        content: asyncResult.message,
+        flags: MessageFlags.Ephemeral
+      });
+    }
+  }
+
+  private async sendAsyncError(interaction: ChatInputCommandInteraction, errorMessage: string): Promise<void> {
+    await interaction.followUp({
+      content: `❌ ${errorMessage}`,
+      flags: MessageFlags.Ephemeral
+    });
   }
 }

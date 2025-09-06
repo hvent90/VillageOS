@@ -289,17 +289,60 @@ export class CommandProcessorService {
       };
     }
 
-    // Get village members
+    // Get village members with baseline URLs
     const villageMembers = await this.villageRepository.getVillageMembers(village.id);
     const memberList = villageMembers
       .map(member => member.user.displayName || member.user.discordId)
       .join(', ');
+    const membersWithBaselines = villageMembers.map(member => ({
+      userId: member.userId,
+      baselineUrl: member.user.baselineUrl,
+      displayName: member.user.displayName || member.user.discordId
+    }));
 
+    // Return immediate response with async work
     return {
       success: true,
-      message: `🏘️ **${village.name}**\n👥 **Members:** ${memberList}\n🌱 **Status:** Village is active!`,
-      data: { village, members: villageMembers }
+      message: `🏘️ **${village.name || 'Village'}**\n👥 **Members:** ${memberList}\n🎨 *Generating village image...*`,
+      data: { village, members: villageMembers },
+      asyncWork: this.generateVillageShowImage(village, membersWithBaselines)
     };
+  }
+
+  private async generateVillageShowImage(
+    village: any,
+    members: Array<{userId: string, baselineUrl?: string, displayName?: string}>
+  ): Promise<AsyncWorkResult> {
+    try {
+      if (!this.villageImageService) {
+        throw new Error('Village image service not available');
+      }
+
+      const villageName = village.name || `Village ${village.guildId.slice(-4)}`;
+      const villageBaselineUrl = village.baselineUrl;
+
+      const imageUrl = await this.villageImageService.generateVillageWithMembersImage(
+        villageName,
+        members,
+        villageBaselineUrl
+      );
+
+      return {
+        mediaData: {
+          type: 'image',
+          url: imageUrl,
+          filename: `village-${village.id}-show.png`,
+          mimeType: 'image/png',
+          caption: `${villageName} - Village with ${members.length} members`
+        },
+        message: `🏘️ Here's your village!`
+      };
+    } catch (error) {
+      console.error('Failed to generate village show image:', error);
+      return {
+        message: `❌ Failed to generate village image. The village information is still available above.`
+      };
+    }
   }
 
    private async handlePingCommand(command: CommandInput): Promise<CommandResult> {
