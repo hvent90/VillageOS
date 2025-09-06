@@ -1,0 +1,20 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "mcp": {
+        "nautex": {
+            "type": "local",
+            "command": ["uvx",
+                "nautex",
+                "mcp"
+            ]
+        },
+        "shadcn": {
+            "type": "local",
+            "command": [
+                "npx",
+                "shadcn@latest",
+                "mcp"
+            ]
+        }
+    }
+}

@@ -1,0 +1,109 @@
+import { Client, GatewayIntentBits, ChatInputCommandInteraction, MessageFlags } from 'discord.js';
+import { CommandProcessorService } from './commandProcessorService';
+import { CommandRegistrationService } from './commandRegistrationService';
+import { DiscordPlatformAdapter } from '../adapters/discordPlatformAdapter';
+import { CommandInput } from '../types/commands';
+import { CommandName } from '../types/commandResults';
+
+export class DiscordBotService {
+  private client: Client;
+  private commandProcessor!: CommandProcessorService;
+  private commandRegistrationService!: CommandRegistrationService;
+
+  constructor(private token: string) {
+    this.client = new Client({
+      intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
+    });
+  }
+
+  async listen(): Promise<void> {
+    this.setupEventHandlers();
+    await this.client.login(this.token);
+  }
+
+  private setupEventHandlers(): void {
+    this.client.on('interactionCreate', async (interaction) => {
+      if (interaction.isChatInputCommand()) {
+        await this.handleSlashCommand(interaction);
+      }
+    });
+  }
+
+  private async handleSlashCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+    // CRITICAL: Defer IMMEDIATELY to meet Discord's 3-second timeout
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const commandInput = this.parseCommand(interaction);
+    const result = await this.commandProcessor.handleCommand(commandInput);
+
+    // Create Discord platform adapter for this interaction
+    const adapter = new DiscordPlatformAdapter(interaction);
+
+    // Send the result using the adapter
+    if (result.success) {
+      await adapter.sendResult(interaction.channelId, result);
+    } else if (result.error) {
+      await adapter.sendError(interaction.channelId, result.error);
+    }
+  }
+
+  private parseCommand(interaction: ChatInputCommandInteraction): CommandInput {
+    // Convert Discord interaction to CommandInput format
+    return {
+      name: this.mapCommandName(interaction.commandName),
+      sourceUserId: interaction.user.id,
+      serverId: interaction.guildId || '', // Use guildId as village identifier (replaces SMS groupHash)
+      channelId: interaction.channelId,
+      args: this.extractArgs(interaction)
+    };
+  }
+
+  private mapCommandName(commandName: string): CommandName {
+    // Map Discord slash commands to our internal command names
+    switch (commandName) {
+      case 'village':
+        // For village commands, the actual command is determined by the subcommand
+        // This will be handled in the command processor based on the args.subcommand
+        return CommandName.SHOW; // Default, will be overridden by subcommand processing
+      default:
+        return CommandName.SHOW; // Default fallback
+    }
+  }
+
+   private extractArgs(interaction: ChatInputCommandInteraction): any {
+     const args: any = {};
+
+     // Extract subcommand
+     if (interaction.options.getSubcommand(false)) {
+       args.subcommand = interaction.options.getSubcommand();
+     }
+
+     // Extract common arguments
+     if (interaction.options.getString('name')) {
+       args.name = interaction.options.getString('name');
+     }
+     if (interaction.options.getInteger('x') !== null) {
+       args.x = interaction.options.getInteger('x');
+     }
+     if (interaction.options.getInteger('y') !== null) {
+       args.y = interaction.options.getInteger('y');
+     }
+     if (interaction.options.getString('description')) {
+       args.description = interaction.options.getString('description');
+     }
+
+     return args;
+   }
+
+  setCommandProcessor(commandProcessor: CommandProcessorService): void {
+    this.commandProcessor = commandProcessor;
+  }
+
+  setCommandRegistrationService(service: CommandRegistrationService): void {
+    this.commandRegistrationService = service;
+  }
+
+  async registerSlashCommands(): Promise<void> {
+    await this.commandRegistrationService.registerCommands();
+  }
+}

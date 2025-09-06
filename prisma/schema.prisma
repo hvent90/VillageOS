@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String @id @default(uuid())
+  discordId     String @unique    // Discord user ID (replaces phoneNumber)
+  baselineUrl   String?           // User avatar baseline image for scene generation
+  displayName   String?           // Optional display name
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // User relationships
+  villageMemberships VillageMember[]   // Villages this user is a member of
+  createdObjects     VillageObject[]   // Objects this user created
+
+  @@map("users")
+}
+
+model Village {
+  id              String @id @default(uuid())
+  guildId         String @unique    // Discord server ID (replaces groupHash)
+  name            String?           // Optional village name
+  baselineUrl     String?           // Current village state image
+  gridWidth       Int @default(10)  // Village grid width for object placement
+  gridHeight      Int @default(10)  // Village grid height for object placement
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Village relationships
+  members         VillageMember[]   // Users who are part of this village
+  objects         VillageObject[]   // Village objects (plants, structures, etc.)
+
+  @@map("villages")
+}
+
+model VillageMember {
+  id          String @id @default(uuid())
+  villageId   String
+  village     Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt    DateTime @default(now())  // When village was created (all join at same time)
+
+  @@unique([villageId, userId])  // User can only be a member once per village
+  @@index([villageId])
+  @@index([userId])
+  @@map("village_members")
+}
+
+model VillageObject {
+  id              String @id @default(uuid())
+  villageId       String
+  village         Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  creatorId       String            // User who created this object
+  creator         User @relation(fields: [creatorId], references: [id])
+
+  // Object placement
+  gridX           Int               // X position on village grid
+  gridY           Int               // Y position on village grid
+
+  // Object type and properties
+  objectType      VillageObjectType // PLANT, STRUCTURE
+  name            String            // User-provided name/description
+  enhancedDescription String?       // LLM-enhanced description
+
+  // Plant-specific stats (null for structures)
+  waterLevel      Float?            // 0.0-1.0, null for structures (1.0 = fully watered, 0.0 = needs water)
+  lastWatered     DateTime?         // Last time plant was watered
+  waterDecayRate  Float?            // Percentage decay per hour (e.g., 0.05 = 5% per hour)
+  growthLevel     Float?            // 0.0-1.0, null for structures (1.0 = ready to harvest, 0.0 = just planted)
+  plantedAt       DateTime?         // When plant was first planted
+  growthRate      Float?            // Percentage growth per hour (e.g., 0.02 = 2% per hour)
+  lastHarvested   DateTime?         // Last time plant was harvested (if applicable)
+
+  // Visual consistency
+  baselineUrl     String?           // Generated baseline image for this object
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([villageId, gridX, gridY]) // Prevent object overlap
+  @@index([villageId])
+  @@map("village_objects")
+}
+
+enum VillageObjectType {
+  PLANT
+  STRUCTURE
+}
+
+
+
+model MediaGenerationQueue {
+  id          String    @id @default(uuid())
+  userId      String // User ID (references User.id)
+  command     String // Original command that triggered generation
+  prompt      String // Full prompt for media generation
+  status      JobStatus @default(PENDING)
+  priority    Int       @default(0) // Higher number = higher priority
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  result      String? // JSON serialized MediaData result
+  error       String? // Last error message
+  createdAt   DateTime  @default(now())
+  scheduledAt DateTime  @default(now()) // When to process (for backoff)
+  completedAt DateTime?
+
+  // New dependency fields
+  parentJobId String? // ID of prerequisite job
+  jobType     JobType // Type of job processing required
+
+  // Self-referential relation for job dependencies
+  parentJob MediaGenerationQueue?  @relation("JobDependency", fields: [parentJobId], references: [id])
+  childJobs MediaGenerationQueue[] @relation("JobDependency")
+
+  @@index([status, priority, scheduledAt])
+  @@index([userId])
+  @@index([parentJobId])
+  @@index([jobType])
+  @@map("media_generation_queue")
+}
+
+enum JobType {
+  BASELINE // User baseline generation
+  VILLAGE_BASELINE // Village baseline generation
+  OBJECT_BASELINE // Object baseline generation
+  ACTION_IMAGE // Regular action images
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  RETRYING
+}
+
+model GameConfiguration {
+  key         String  @id
+  value       String
+  description String?
+
+  @@map("game_configuration")
+}
