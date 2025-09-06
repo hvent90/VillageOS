@@ -138,7 +138,7 @@ npm run start:web
 ## Available Commands
 
 ### Discord Slash Commands
-- `/village create <name>` - Create a new village
+- `/village create name:"My Farm" description:"A peaceful countryside village with rolling hills"` - Create a new village with AI-generated landscape
 - `/village show` - Display village status
 - `/village plant <x> <y>` - Plant crops at coordinates
 - `/village water <x> <y>` - Water crops at coordinates
@@ -148,6 +148,12 @@ npm run start:web
 ### Character Customization
 - `/village me description:"I want to look like a farmer with red hair and overalls"`
   - Generates a new character appearance using AI
+
+### Village Creation
+- `/village create name:"My Farm" description:"A peaceful countryside village with rolling hills"`
+  - Creates a new village with AI-generated landscape image
+  - Optional description customizes the village's appearance
+  - Generated image serves as the village's visual representation
   - Updates your baseline image for all future village interactions
 
 ### Legacy SMS Commands

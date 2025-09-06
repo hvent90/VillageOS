@@ -15,6 +15,13 @@ export const slashCommands = [
             .setMinLength(2)
             .setMaxLength(50)
         )
+        .addStringOption(option =>
+          option.setName('description')
+            .setDescription('Optional: Describe your village\'s appearance and atmosphere')
+            .setRequired(false)
+            .setMinLength(10)
+            .setMaxLength(200)
+        )
     )
     .addSubcommand(subcommand =>
       subcommand

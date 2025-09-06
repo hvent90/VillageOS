@@ -48,13 +48,16 @@ export class DiscordBotService {
   }
 
   private parseCommand(interaction: ChatInputCommandInteraction): CommandInput {
+    const args = this.extractArgs(interaction);
+
     // Convert Discord interaction to CommandInput format
     return {
       name: this.mapCommandName(interaction.commandName),
       sourceUserId: interaction.user.id,
       serverId: interaction.guildId || '', // Use guildId as village identifier (replaces SMS groupHash)
       channelId: interaction.channelId,
-      args: this.extractArgs(interaction)
+      args: args,
+      villageDescription: args.description || undefined  // Extract village description
     };
   }
 

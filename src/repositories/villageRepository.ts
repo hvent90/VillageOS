@@ -178,4 +178,11 @@ export class VillageRepository {
       data: { baselineUrl }
     });
   }
+
+  async updateVillageBaselineByGuildId(guildId: string, baselineUrl: string): Promise<Village> {
+    return this.prisma.village.update({
+      where: { guildId },
+      data: { baselineUrl, updatedAt: new Date() }
+    });
+  }
 }

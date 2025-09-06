@@ -8,7 +8,8 @@ export interface CommandInput {
   serverId: string;
   channelId: string;
   args?: string[];
-  userDescription?: string;  // NEW: Optional user-provided description
+  userDescription?: string;  // For character customization
+  villageDescription?: string;  // NEW: For village creation
   referenceImageUrl?: string; // NEW: Optional reference image URL
 }
 
@@ -20,3 +21,9 @@ export interface InteractionResult {
 }
 
 export type CommandType = 'solo' | 'social';
+
+export interface VillageImageResult {
+  villageId: string;
+  imageUrl: string;
+  description?: string;
+}

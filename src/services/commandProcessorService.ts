@@ -5,40 +5,44 @@ import { GameConfigurationService } from './gameConfigurationService';
 import { VillageRepository } from '../repositories/villageRepository';
 import { UserRepository } from '../repositories/userRepository';
 import { LLMPromptService } from './llmPromptService';
+import { VillageImageService } from './villageImageService';
 import { CommandInput } from '../types/commands';
 import { CommandResult, CommandError, CommandName, AsyncWorkResult, MediaData } from '../types/commandResults';
 import { EnvironmentConfig } from '../config/environment';
 import logger from '../config/logger';
 
 export class CommandProcessorService {
-   private envConfig: EnvironmentConfig;
-   private mediaGenerationService: MediaGenerationService;
-   private queueService: MediaGenerationQueueService;
-   private configService?: GameConfigurationService;
-   private villageRepository?: VillageRepository;
-   private userRepository?: UserRepository;
-   private llmPromptService?: LLMPromptService;
-   private platformAdapter?: any;
+    private envConfig: EnvironmentConfig;
+    private mediaGenerationService: MediaGenerationService;
+    private queueService: MediaGenerationQueueService;
+    private configService?: GameConfigurationService;
+    private villageRepository?: VillageRepository;
+    private userRepository?: UserRepository;
+    private llmPromptService?: LLMPromptService;
+    private villageImageService?: VillageImageService;
+    private platformAdapter?: any;
 
-   constructor(
-     gameLogic: any, // Removed
-     envConfig: EnvironmentConfig,
-     mediaGenerationService: MediaGenerationService,
-     queueService: MediaGenerationQueueService,
-     configService?: GameConfigurationService,
-     villageRepository?: VillageRepository,
-     userRepository?: UserRepository,
-     llmPromptService?: LLMPromptService,
-     platformAdapter?: any
-   ) {
-     this.envConfig = envConfig;
-     this.mediaGenerationService = mediaGenerationService;
-     this.queueService = queueService;
-     this.configService = configService;
-     this.villageRepository = villageRepository;
-     this.userRepository = userRepository;
-     this.llmPromptService = llmPromptService;
-     this.platformAdapter = platformAdapter;
+    constructor(
+      gameLogic: any, // Removed
+      envConfig: EnvironmentConfig,
+      mediaGenerationService: MediaGenerationService,
+      queueService: MediaGenerationQueueService,
+      configService?: GameConfigurationService,
+      villageRepository?: VillageRepository,
+      userRepository?: UserRepository,
+      llmPromptService?: LLMPromptService,
+      villageImageService?: any,
+      platformAdapter?: any
+    ) {
+      this.envConfig = envConfig;
+      this.mediaGenerationService = mediaGenerationService;
+      this.queueService = queueService;
+      this.configService = configService;
+      this.villageRepository = villageRepository;
+      this.userRepository = userRepository;
+      this.llmPromptService = llmPromptService;
+      this.villageImageService = villageImageService;
+      this.platformAdapter = platformAdapter;
    }
 
   async handleCommand(command: CommandInput): Promise<CommandResult> {
@@ -133,6 +137,7 @@ export class CommandProcessorService {
 
       return {
         success: true,
+        message: '🌱 You planted a seed! Your village grows stronger.',
         data: null,
         asyncWork: undefined
       };
@@ -151,10 +156,20 @@ export class CommandProcessorService {
     }
   }
   private async handleWaterCommand(command: CommandInput): Promise<CommandResult> {
-    return { success: true, data: null, asyncWork: undefined };
+    return {
+      success: true,
+      message: '💧 You watered your crops! They\'re growing nicely.',
+      data: null,
+      asyncWork: undefined
+    };
   }
   private async handleBuildCommand(command: CommandInput): Promise<CommandResult> {
-    return { success: true, data: null, asyncWork: undefined };
+    return {
+      success: true,
+      message: '🏗️ You built something new for your village! It\'s growing beautifully.',
+      data: null,
+      asyncWork: undefined
+    };
   }
   private async handleCreateCommand(command: CommandInput): Promise<CommandResult> {
     if (!this.villageRepository || !this.userRepository) {
@@ -198,9 +213,40 @@ export class CommandProcessorService {
         villageName
       );
 
+      // Generate village image if service is available
+      let villageImageUrl: string | undefined;
+      if (this.villageImageService) {
+        try {
+          villageImageUrl = await this.villageImageService.generateVillageImage(
+            villageName,
+            command.villageDescription
+          );
+
+          // Update village with generated image
+          await this.villageRepository.updateVillageBaselineByGuildId(command.serverId, villageImageUrl);
+        } catch (error) {
+          logger.warn({
+            event: 'village_image_generation_failed',
+            error: error instanceof Error ? error.message : String(error),
+            villageId: village.id
+          });
+          // Continue with village creation even if image generation fails
+        }
+      }
+
+      const successMessage = villageImageUrl
+        ? `🏘️ Village "${village.name}" has been created with a beautiful landscape! Use \`/village show\` to see your village.`
+        : `🏘️ Village "${village.name}" has been created! Use \`/village show\` to see your village status.`;
+
       return {
         success: true,
-        message: `🏘️ Village "${village.name}" has been created! Use \`/village show\` to see your village status.`
+        message: successMessage,
+        mediaData: villageImageUrl ? {
+          type: 'image',
+          url: villageImageUrl,
+          filename: `village-${village.id}.png`,
+          mimeType: 'image/png'
+        } : undefined
       };
     } catch (error) {
       logger.error({
@@ -220,7 +266,38 @@ export class CommandProcessorService {
     }
   }
   private async handleShowCommand(command: CommandInput): Promise<CommandResult> {
-    return { success: true, data: null, asyncWork: undefined };
+    if (!this.villageRepository) {
+      return {
+        success: false,
+        error: {
+          type: 'INTERNAL',
+          message: 'Village repository not available'
+        }
+      };
+    }
+
+    const village = await this.villageRepository.findByGuildId(command.serverId);
+    if (!village) {
+      return {
+        success: false,
+        error: {
+          type: 'VALIDATION',
+          message: 'Village not found. Please create a village first with `/village create`.'
+        }
+      };
+    }
+
+    // Get village members
+    const villageMembers = await this.villageRepository.getVillageMembers(village.id);
+    const memberList = villageMembers
+      .map(member => member.user.displayName || member.user.discordId)
+      .join(', ');
+
+    return {
+      success: true,
+      message: `🏘️ **${village.name}**\n👥 **Members:** ${memberList}\n🌱 **Status:** Village is active!`,
+      data: { village, members: villageMembers }
+    };
   }
 
    private async handlePingCommand(command: CommandInput): Promise<CommandResult> {

@@ -15,6 +15,7 @@ import { MediaGenerationService } from './services/mediaGenerationService';
 import { GameConfigurationService } from './services/gameConfigurationService';
 import { GameConfigurationRepository } from './repositories/gameConfigurationRepository';
 import { LLMPromptService } from './services/llmPromptService';
+import { VillageImageService } from './services/villageImageService';
 
 import logger from './config/logger';
 
@@ -53,6 +54,13 @@ async function main() {
     // Initialize LLM prompt service
     const llmPromptService = new LLMPromptService(envConfig.geminiApiKey, envConfig.geminiTextModel);
 
+    // Initialize village image service
+    const villageImageService = new VillageImageService(
+      mediaGenerationService,
+      llmPromptService,
+      villageRepository
+    );
+
     // Initialize queue repository and service
     const queueRepository = new MediaGenerationQueueRepository();
     const queueService = new MediaGenerationQueueService(
@@ -82,16 +90,17 @@ async function main() {
 
     // Initialize command processor with framework dependencies
      const commandProcessorService = new CommandProcessorService(
-       null as any, // gameLogic - removed
-       envConfig,
-       mediaGenerationService,
-       queueService,
-       configService,
-       villageRepository,
-       userRepository,
-       llmPromptService,
-       null as any // platformAdapter - will be set per Discord interaction
-     );
+      null as any, // gameLogic - removed
+      envConfig,
+      mediaGenerationService,
+      queueService,
+      configService,
+      villageRepository,
+      userRepository,
+      llmPromptService,
+      villageImageService,
+      null as any // platformAdapter - will be set per Discord interaction
+    );
 
     // Set up Discord bot
     discordBotService.setCommandRegistrationService(commandRegistrationService);
