@@ -5,6 +5,8 @@ Thank you for taking the time to evaluate VillageOS! I'm excited to share my coz
 ### Get Started
 Join the Discord server to interact with the bot: [https://discord.gg/PzzvE8KK](https://discord.gg/PzzvE8KK)
 
+Or add the bot to your server: [https://discord.com/oauth2/authorize?client_id=1413956635533250580&permissions=2147813376&integration_type=0&scope=applications.commands+bot](long-url)
+
 ### Quick Commands to Try
 - `/village me description:"Custom appearance"` - Customize your character
 - `/village create name:"My Farm"` - Create your own village (one per server)
