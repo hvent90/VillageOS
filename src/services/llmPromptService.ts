@@ -306,6 +306,7 @@ export class LLMPromptService {
     plantDescription: string,
     userImageData?: Buffer | string,
     villageImageData?: Buffer | string,
+    plantImageData?: Buffer | string,
     supabaseMediaService?: SupabaseMediaService
   ): Promise<string> {
     const prompt = `You are creating a cinematic prompt for an AI image generator to show a character planting ${plantDescription} in their village.
@@ -314,7 +315,7 @@ CORE REQUIREMENTS:
 - Create a dramatic, cinematic close-up scene
 - Show the character actively planting the ${plantDescription}
 - Use professional cinematography techniques
-- Maintain visual consistency with the reference images
+- Maintain visual consistency with ALL reference images
 - Focus on the planting action and character expression
 
 CINEMATIC ELEMENTS:
@@ -331,9 +332,11 @@ COMPOSITION:
 - Depth of field effects
 
 STYLE CONSISTENCY:
-- Match the character's appearance exactly from the reference image
+- Match the character's appearance exactly from the first reference image
+- Match the plant's appearance exactly from the third reference image
 - Match the village environment from the second reference image
-- Maintain the same art style and visual quality`;
+- Maintain the same art style and visual quality across all elements
+- The plant in the cinematic scene must look identical to the plant reference image`;
 
     // Prepare image data for multi-modal generation
     const imageData: Array<{ data: Buffer | string, mimeType: string }> = [];
@@ -375,6 +378,26 @@ STYLE CONSISTENCY:
       } else {
         // It's already buffer or base64 data
         imageData.push({ data: villageImageData, mimeType: 'image/jpeg' });
+      }
+    }
+
+    if (plantImageData) {
+      if (typeof plantImageData === 'string' && plantImageData.startsWith('http')) {
+        // It's a URL, fetch the image data
+        if (supabaseMediaService) {
+          try {
+            const fetchedData = await supabaseMediaService.fetchImageDataFromUrl(plantImageData);
+            imageData.push({
+              data: fetchedData.data.toString('base64'),
+              mimeType: fetchedData.mimeType
+            });
+          } catch (error) {
+            logger.warn(`Failed to fetch plant image data from URL: ${error}`);
+          }
+        }
+      } else {
+        // It's already buffer or base64 data
+        imageData.push({ data: plantImageData, mimeType: 'image/jpeg' });
       }
     }
 

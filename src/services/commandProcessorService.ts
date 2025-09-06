@@ -191,11 +191,65 @@ export class CommandProcessorService {
 
 
 
+      // Generate both village update and cinematic scene
+      const villageUpdatePromise = this.generatePlantVillageUpdate(village, plant, plantDescription, position.x, position.y, user.id);
+
+      // Combine both results into a single async work
+      const combinedAsyncWork = async (): Promise<AsyncWorkResult> => {
+        const villageUpdateResult = await villageUpdatePromise;
+
+        // Check if village update was successful and has plant baseline URL
+        const plantBaselineUrl = 'plantBaselineUrl' in villageUpdateResult ? villageUpdateResult.plantBaselineUrl : undefined;
+
+        // Now generate cinematic scene with the plant baseline URL
+        const cinematicPromise = this.generateCinematicPlantingScene(
+          plantDescription,
+          user.baselineUrl || undefined,
+          village.baselineUrl || undefined,
+          plantBaselineUrl, // Pass the plant baseline URL if available
+          user.id
+        );
+
+        const [cinematicResult] = await Promise.allSettled([cinematicPromise]);
+
+        const mediaItems: MediaData[] = [];
+        let combinedMessage = '';
+
+        // Handle village update result
+        if ('result' in villageUpdateResult && villageUpdateResult.result.mediaData) {
+          const media = Array.isArray(villageUpdateResult.result.mediaData)
+            ? villageUpdateResult.result.mediaData
+            : [villageUpdateResult.result.mediaData];
+          mediaItems.push(...media);
+          if (villageUpdateResult.result.message) {
+            combinedMessage += villageUpdateResult.result.message + '\n';
+          }
+        }
+
+        // Handle cinematic result
+        if (cinematicResult.status === 'fulfilled' && cinematicResult.value.mediaData) {
+          const media = Array.isArray(cinematicResult.value.mediaData)
+            ? cinematicResult.value.mediaData
+            : [cinematicResult.value.mediaData];
+          mediaItems.push(...media);
+          if (cinematicResult.value.message) {
+            combinedMessage += cinematicResult.value.message + '\n';
+          }
+        } else if (cinematicResult.status === 'rejected') {
+          combinedMessage += `❌ Cinematic generation failed: ${cinematicResult.reason}\n`;
+        }
+
+        return {
+          mediaData: mediaItems.length > 0 ? mediaItems : undefined,
+          message: combinedMessage.trim() || 'Planting completed!'
+        };
+      };
+
       return {
         success: true,
-        message: `🌱 You planted ${plantDescription}! Generating your updated village...`,
+        message: `🌱 You planted ${plantDescription}! Generating your updated village and cinematic scene...`,
         data: { plant, village },
-        asyncWork: this.generateTwoStepPlantBaselineWithCinematic(village, plant, plantDescription, position.x, position.y, user.baselineUrl || undefined, village.baselineUrl || undefined, user.id)
+        asyncWork: combinedAsyncWork()
       };
 
     } catch (error) {
@@ -538,16 +592,14 @@ export class CommandProcessorService {
     }
   }
 
-  private async generateTwoStepPlantBaselineWithCinematic(
+  private async generatePlantVillageUpdate(
     village: any,
     plant: any,
     plantDescription: string,
     gridX: number,
     gridY: number,
-    userBaselineUrl: string | undefined,
-    villageBaselineUrl: string | undefined,
     userId: string
-  ): Promise<AsyncWorkResult> {
+  ): Promise<{ result: AsyncWorkResult, plantBaselineUrl: string } | { message: string }> {
     try {
       if (!this.villageImageService || !this.villageRepository) {
         throw new Error('Required services not available');
@@ -578,67 +630,81 @@ export class CommandProcessorService {
       // Step 3: Save new village baseline
       await this.villageRepository.updateVillageBaselineByGuildId(village.guildId, updatedVillageBaselineUrl);
 
-      // Step 4: Generate cinematic scene (async, doesn't block village update)
-      let cinematicMediaData: MediaData | undefined;
-      try {
-        if (this.llmPromptService && this.mediaGenerationService && userBaselineUrl && villageBaselineUrl) {
-           // Create enhanced cinematic prompt using specialized method
-           const supabaseMediaService = this.mediaGenerationService.getSupabaseMediaService();
-           const enhancedPrompt = await this.llmPromptService.generateCinematicPlantingPrompt(
-             plantDescription,
-             userBaselineUrl,
-             villageBaselineUrl,
-             supabaseMediaService
-           );
-
-          // Generate cinematic image
-          const mediaRequest: any = {
-            prompt: enhancedPrompt,
-            baselineImages: [userBaselineUrl, villageBaselineUrl],
-            jobType: 'CINEMATIC_PLANTING',
-            userId: userId
-          };
-
-          const cinematicImage = await this.mediaGenerationService.generateMedia(mediaRequest);
-
-          cinematicMediaData = {
+      // Return village update result with plant baseline URL
+      return {
+        result: {
+          mediaData: {
             type: 'image',
-            url: cinematicImage.url,
-            filename: `cinematic-planting-${userId}-${Date.now()}.png`,
+            url: updatedVillageBaselineUrl,
+            filename: `village-${village.id}-updated.png`,
             mimeType: 'image/png',
-            caption: `🌱 Cinematic view of planting ${plantDescription}!`
-          };
-        }
-      } catch (cinematicError) {
-        console.error('Failed to generate cinematic scene, continuing with village update:', cinematicError);
-        // Don't fail the whole operation if cinematic generation fails
-      }
-
-      // Return both village update and cinematic scene
-      const mediaItems: MediaData[] = [{
-        type: 'image',
-        url: updatedVillageBaselineUrl,
-        filename: `village-${village.id}-updated.png`,
-        mimeType: 'image/png',
-        caption: `${villageName} - Updated with ${plantDescription} at (${gridX}, ${gridY})`
-      }];
-
-      if (cinematicMediaData) {
-        mediaItems.push(cinematicMediaData);
-      }
-
-      return {
-        mediaData: mediaItems,
-        message: `🏘️ Your village has been updated with the new ${plantDescription}!${cinematicMediaData ? ' Here\'s a cinematic view too!' : ''}`
+            caption: `${villageName} - Updated with ${plantDescription} at (${gridX}, ${gridY})`
+          },
+          message: `🌱 Successfully planted ${plantDescription} in your village!`
+        },
+        plantBaselineUrl: plantBaselineUrl
       };
-
     } catch (error) {
-      console.error('Failed to generate two-step plant baseline with cinematic:', error);
+      console.error('Failed to update village with plant:', error);
       return {
-        message: `✅ Plant added successfully! The village image will be updated shortly.`
+        message: `❌ Failed to update village with plant: ${error instanceof Error ? error.message : String(error)}`
       };
     }
   }
+
+  private async generateCinematicPlantingScene(
+    plantDescription: string,
+    userBaselineUrl: string | undefined,
+    villageBaselineUrl: string | undefined,
+    plantBaselineUrl: string | undefined,
+    userId: string
+  ): Promise<AsyncWorkResult> {
+    try {
+      if (!this.llmPromptService || !this.mediaGenerationService || !userBaselineUrl || !villageBaselineUrl) {
+        return {
+          message: 'Cinematic generation skipped - missing required services or baseline images'
+        };
+      }
+
+      // Create enhanced cinematic prompt using specialized method
+      const supabaseMediaService = this.mediaGenerationService.getSupabaseMediaService();
+      const enhancedPrompt = await this.llmPromptService.generateCinematicPlantingPrompt(
+        plantDescription,
+        userBaselineUrl,
+        villageBaselineUrl,
+        plantBaselineUrl,
+        supabaseMediaService
+      );
+
+      // Generate cinematic image
+      const mediaRequest: any = {
+        prompt: enhancedPrompt,
+        baselineImages: [userBaselineUrl, villageBaselineUrl],
+        jobType: 'CINEMATIC_PLANTING',
+        userId: userId
+      };
+
+      const cinematicImage = await this.mediaGenerationService.generateMedia(mediaRequest);
+
+      return {
+        mediaData: {
+          type: 'image',
+          url: cinematicImage.url,
+          filename: `cinematic-planting-${userId}-${Date.now()}.png`,
+          mimeType: 'image/png',
+          caption: `🌱 Cinematic view of planting ${plantDescription}!`
+        },
+        message: `🎬 Cinematic scene generated for planting ${plantDescription}!`
+      };
+    } catch (error) {
+      console.error('Failed to generate cinematic scene:', error);
+      return {
+        message: `❌ Failed to generate cinematic scene: ${error instanceof Error ? error.message : String(error)}`
+      };
+    }
+  }
+
+
 
   private async generateTwoStepPlantBaseline(
     village: any,
