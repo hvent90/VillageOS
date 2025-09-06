@@ -88,22 +88,24 @@ export class CommandProcessorService {
          command.userDescription = (command.args as any).description;
        }
 
-       switch (subcommand) {
-         case 'create':
-           return await this.handleCreateCommand(command);
-         case 'show':
-           return await this.handleShowCommand(command);
-         case 'plant':
-           return await this.handlePlantCommand(command);
-         case 'water':
-           return await this.handleWaterCommand(command);
-         case 'build':
-           return await this.handleBuildCommand(command);
-         case 'me':
-           return await this.handleMeCommand(command);
-         default:
-           return await this.handleShowCommand(command); // Default to show
-       }
+        switch (subcommand) {
+          case 'create':
+            return await this.handleCreateCommand(command);
+          case 'show':
+            return await this.handleShowCommand(command);
+          case 'plant':
+            return await this.handlePlantCommand(command);
+          case 'water':
+            return await this.handleWaterCommand(command);
+          case 'build':
+            return await this.handleBuildCommand(command);
+          case 'me':
+            return await this.handleMeCommand(command);
+          case 'delete':
+            return await this.handleDeleteCommand(command);
+          default:
+            return await this.handleShowCommand(command); // Default to show
+        }
      }
 
     // Handle legacy command routing
@@ -335,76 +337,116 @@ export class CommandProcessorService {
      };
    }
 
-   private async handleMeCommand(command: CommandInput): Promise<CommandResult> {
-     if (!command.userDescription) {
-       return {
-         success: false,
-         error: {
-           type: 'VALIDATION',
-           message: 'Please provide a description of how you want to look.'
-         }
-       };
-     }
+  private async handleMeCommand(command: CommandInput): Promise<CommandResult> {
+    if (!command.userDescription) {
+      return {
+        success: false,
+        error: {
+          type: 'VALIDATION',
+          message: 'Please provide a description of how you want to look.'
+        }
+      };
+    }
 
-     if (!this.userRepository || !this.llmPromptService) {
-       return {
-         success: false,
-         error: {
-           type: 'INTERNAL',
-           message: 'Required services not available'
-         }
-       };
-     }
+    if (!this.userRepository || !this.llmPromptService) {
+      return {
+        success: false,
+        error: {
+          type: 'INTERNAL',
+          message: 'Required services not available'
+        }
+      };
+    }
 
-     try {
-       // Check if user exists, create if not
-       let user = await this.userRepository.findByDiscordId(command.sourceUserId);
-       if (!user) {
-         user = await this.userRepository.createUser(command.sourceUserId);
-       }
+    try {
+      // Check if user exists, create if not
+      let user = await this.userRepository.findByDiscordId(command.sourceUserId);
+      if (!user) {
+        user = await this.userRepository.createUser(command.sourceUserId);
+      }
 
-       // Step 1: Use LLM to optimize the user's description into an effective prompt
-       const optimizedPrompt = await this.optimizePromptWithLLM(command.userDescription);
+      // Step 1: Use LLM to optimize the user's description into an effective prompt
+      const optimizedPrompt = await this.optimizePromptWithLLM(command.userDescription);
 
-       // Step 2: Generate image directly using the media generation service
-       const tempFileInfo = await this.mediaGenerationService.generateMedia({
-         prompt: optimizedPrompt,
-         type: 'image',
-         jobType: 'BASELINE'
-       });
+      // Step 2: Generate image directly using the media generation service
+      const tempFileInfo = await this.mediaGenerationService.generateMedia({
+        prompt: optimizedPrompt,
+        type: 'image',
+        jobType: 'BASELINE'
+      });
 
-       // Convert TempFileInfo to MediaData
-       const mediaData: MediaData = {
-         type: 'image',
-         url: tempFileInfo.url,
-         filename: tempFileInfo.filename,
-         mimeType: 'image/png' // Assuming PNG for now
-       };
+      // Convert TempFileInfo to MediaData
+      const mediaData: MediaData = {
+        type: 'image',
+        url: tempFileInfo.url,
+        filename: tempFileInfo.filename,
+        mimeType: 'image/png' // Assuming PNG for now
+      };
 
-       // Step 3: Update user's baseline URL
-       await this.userRepository.updateUserBaseline(command.sourceUserId, mediaData.url);
+      // Step 3: Update user's baseline URL
+      await this.userRepository.updateUserBaseline(command.sourceUserId, mediaData.url);
 
-       return {
-         success: true,
-         message: '✨ Your new appearance has been generated!',
-         mediaData: mediaData
-       };
+      return {
+        success: true,
+        message: '✨ Your new appearance has been generated!',
+        mediaData: mediaData
+      };
 
-     } catch (error) {
-       logger.error({
-         event: 'character_customization_error',
-         error: error instanceof Error ? error.message : String(error),
-         userId: command.sourceUserId
-       });
-       return {
-         success: false,
-         error: {
-           type: 'INTERNAL',
-           message: '❌ Sorry, we couldn\'t generate your custom appearance right now. Please try again later.'
-         }
-       };
-     }
-   }
+    } catch (error) {
+      logger.error({
+        event: 'character_customization_error',
+        error: error instanceof Error ? error.message : String(error),
+        userId: command.sourceUserId
+      });
+      return {
+        success: false,
+        error: {
+          type: 'INTERNAL',
+          message: '❌ Sorry, we couldn\'t generate your custom appearance right now. Please try again later.'
+        }
+      };
+    }
+  }
+
+  private async handleDeleteCommand(command: CommandInput): Promise<CommandResult> {
+    if (!this.villageRepository) {
+      return {
+        success: false,
+        error: { type: 'INTERNAL', message: 'Village service unavailable' }
+      };
+    }
+
+    try {
+      // Find village by server ID
+      const village = await this.villageRepository.findByGuildId(command.serverId);
+      if (!village) {
+        return {
+          success: false,
+          error: { type: 'VALIDATION', message: 'No village found for this server' }
+        };
+      }
+
+      // Delete village (cascade handles cleanup)
+      await this.villageRepository.deleteVillage(village.id);
+
+      return {
+        success: true,
+        message: `🗑️ Village "${village.name || 'Unnamed'}" has been permanently deleted. All members and objects have been removed.`
+      };
+
+    } catch (error) {
+      logger.error({
+        event: 'village_delete_error',
+        error: error instanceof Error ? error.message : String(error),
+        serverId: command.serverId
+      });
+
+      return {
+        success: false,
+        error: { type: 'INTERNAL', message: 'Failed to delete village' }
+      };
+    }
+  }
 
    private async optimizePromptWithLLM(userDescription: string): Promise<string> {
 //      const optimizationPrompt = `You are optimizing user descriptions for a farming village character image generator.

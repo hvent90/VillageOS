@@ -185,4 +185,20 @@ export class VillageRepository {
       data: { baselineUrl, updatedAt: new Date() }
     });
   }
+
+  async deleteVillage(villageId: string): Promise<void> {
+    // Verify village exists before deletion
+    const village = await this.prisma.village.findUnique({
+      where: { id: villageId }
+    });
+
+    if (!village) {
+      throw new Error('Village not found');
+    }
+
+    // Delete village (cascade will handle members and objects)
+    await this.prisma.village.delete({
+      where: { id: villageId }
+    });
+  }
 }

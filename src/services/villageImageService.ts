@@ -44,17 +44,12 @@ export class VillageImageService {
   private async optimizeVillagePrompt(villageName: string, description: string): Promise<string> {
     const optimizationPrompt = `You are optimizing user descriptions for a farming village image generator.
 
-User wants their village "${villageName}" to look like: "${description}"
+User wants their village to look like: "${description}".
+
+The village is currently an EMPTY PLOT OF LAND.
+The user interacts with the village via a 2D grid, so make sure to keep in mind that we are trying to visualize a PLOT of land.
 
 Create an optimized prompt for Gemini AI image generation that will produce a beautiful, atmospheric village scene suitable for a collaborative farming game.
-
-Focus on:
-- Peaceful, inviting farming village atmosphere
-- Natural landscape with fields, farms, and countryside
-- Appropriate scale and composition for a game environment
-- Warm, welcoming aesthetic suitable for all ages
-- Clear village structures and landmarks
-- Professional landscape photography style
 
 Return only the optimized prompt, no additional text or explanation.`;
 

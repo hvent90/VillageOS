@@ -85,16 +85,21 @@ export const slashCommands = [
              .setMaxValue(9)
          )
      )
-     .addSubcommand(subcommand =>
-       subcommand
-         .setName('me')
-         .setDescription('🎨 Customize your character appearance')
-         .addStringOption(option =>
-           option.setName('description')
-             .setDescription('Describe how you want to look (e.g., "red hair, blue eyes, farmer outfit")')
-             .setRequired(true)
-             .setMinLength(10)
-             .setMaxLength(200)
-         )
-     )
+      .addSubcommand(subcommand =>
+        subcommand
+          .setName('me')
+          .setDescription('🎨 Customize your character appearance')
+          .addStringOption(option =>
+            option.setName('description')
+              .setDescription('Describe how you want to look (e.g., "red hair, blue eyes, farmer outfit")')
+              .setRequired(true)
+              .setMinLength(10)
+              .setMaxLength(200)
+          )
+      )
+      .addSubcommand(subcommand =>
+        subcommand
+          .setName('delete')
+          .setDescription('🗑️ Delete village')
+      )
 ];

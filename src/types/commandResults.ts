@@ -4,7 +4,8 @@ export enum CommandName {
    BUILD = 'build',
    SHOW = 'show',
    PING = 'ping',
-   ME = 'me'
+   ME = 'me',
+   DELETE = 'delete'
 }
 
 // NEW: Interface for async work results
