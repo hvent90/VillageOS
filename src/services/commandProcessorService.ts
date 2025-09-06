@@ -189,11 +189,13 @@ export class CommandProcessorService {
         position.y
       );
 
+
+
       return {
         success: true,
         message: `🌱 You planted ${plantDescription}! Generating your updated village...`,
         data: { plant, village },
-        asyncWork: this.generateTwoStepPlantBaseline(village, plant, plantDescription, position.x, position.y)
+        asyncWork: this.generateTwoStepPlantBaselineWithCinematic(village, plant, plantDescription, position.x, position.y, user.baselineUrl || undefined, village.baselineUrl || undefined, user.id)
       };
 
     } catch (error) {
@@ -536,6 +538,108 @@ export class CommandProcessorService {
     }
   }
 
+  private async generateTwoStepPlantBaselineWithCinematic(
+    village: any,
+    plant: any,
+    plantDescription: string,
+    gridX: number,
+    gridY: number,
+    userBaselineUrl: string | undefined,
+    villageBaselineUrl: string | undefined,
+    userId: string
+  ): Promise<AsyncWorkResult> {
+    try {
+      if (!this.villageImageService || !this.villageRepository) {
+        throw new Error('Required services not available');
+      }
+
+      // Step 1: Generate plant baseline
+      const plantBaselineUrl = await this.villageImageService.generatePlantBaseline(plantDescription);
+
+      // Update plant object with baseline URL
+      await this.villageRepository.updateObjectBaseline(plant.id, plantBaselineUrl);
+
+      // Step 2: Update village baseline with new plant
+      const villageName = village.name || `Village ${village.guildId.slice(-4)}`;
+      const currentVillageBaseline = village.baselineUrl;
+
+      if (!currentVillageBaseline) {
+        throw new Error('Village has no baseline image to update');
+      }
+
+      const updatedVillageBaselineUrl = await this.villageImageService.updateVillageBaseline(
+        villageName,
+        currentVillageBaseline,
+        plantBaselineUrl,
+        gridX,
+        gridY
+      );
+
+      // Step 3: Save new village baseline
+      await this.villageRepository.updateVillageBaselineByGuildId(village.guildId, updatedVillageBaselineUrl);
+
+      // Step 4: Generate cinematic scene (async, doesn't block village update)
+      let cinematicMediaData: MediaData | undefined;
+      try {
+        if (this.llmPromptService && this.mediaGenerationService && userBaselineUrl && villageBaselineUrl) {
+           // Create enhanced cinematic prompt using specialized method
+           const supabaseMediaService = this.mediaGenerationService.getSupabaseMediaService();
+           const enhancedPrompt = await this.llmPromptService.generateCinematicPlantingPrompt(
+             plantDescription,
+             userBaselineUrl,
+             villageBaselineUrl,
+             supabaseMediaService
+           );
+
+          // Generate cinematic image
+          const mediaRequest: any = {
+            prompt: enhancedPrompt,
+            baselineImages: [userBaselineUrl, villageBaselineUrl],
+            jobType: 'CINEMATIC_PLANTING',
+            userId: userId
+          };
+
+          const cinematicImage = await this.mediaGenerationService.generateMedia(mediaRequest);
+
+          cinematicMediaData = {
+            type: 'image',
+            url: cinematicImage.url,
+            filename: `cinematic-planting-${userId}-${Date.now()}.png`,
+            mimeType: 'image/png',
+            caption: `🌱 Cinematic view of planting ${plantDescription}!`
+          };
+        }
+      } catch (cinematicError) {
+        console.error('Failed to generate cinematic scene, continuing with village update:', cinematicError);
+        // Don't fail the whole operation if cinematic generation fails
+      }
+
+      // Return both village update and cinematic scene
+      const mediaItems: MediaData[] = [{
+        type: 'image',
+        url: updatedVillageBaselineUrl,
+        filename: `village-${village.id}-updated.png`,
+        mimeType: 'image/png',
+        caption: `${villageName} - Updated with ${plantDescription} at (${gridX}, ${gridY})`
+      }];
+
+      if (cinematicMediaData) {
+        mediaItems.push(cinematicMediaData);
+      }
+
+      return {
+        mediaData: mediaItems,
+        message: `🏘️ Your village has been updated with the new ${plantDescription}!${cinematicMediaData ? ' Here\'s a cinematic view too!' : ''}`
+      };
+
+    } catch (error) {
+      console.error('Failed to generate two-step plant baseline with cinematic:', error);
+      return {
+        message: `✅ Plant added successfully! The village image will be updated shortly.`
+      };
+    }
+  }
+
   private async generateTwoStepPlantBaseline(
     village: any,
     plant: any,
@@ -791,21 +895,31 @@ export class CommandProcessorService {
     }
   }
 
-   private async optimizePromptWithLLM(userDescription: string): Promise<string> {
-     const optimizationPrompt = `You are optimizing user descriptions for a farming village character image generator. ` +
-         `User wants to look like: "${userDescription}". `+
-         `If the user has not explicitly stated a style or aesthetic, default to a cute pixel-art style.`;
 
-     // Use existing LLM service
-     if (!this.llmPromptService) {
-       return userDescription; // Fallback to original if LLM service not available
-     }
 
-     const response = await this.llmPromptService.generate(optimizationPrompt);
-     return response ? response.trim() : userDescription; // Fallback to original if LLM fails
-   }
+    private async optimizePromptWithLLM(userDescription: string): Promise<string> {
+      const optimizationPrompt = `You are optimizing user descriptions for a farming village character image generator.
 
-   private validateMeDescription(description: string): { valid: boolean, error?: string } {
+User wants to look like: "${userDescription}".
+
+If the user has not explicitly stated a style or aesthetic, default to a cute pixel-art style.
+
+Create an optimized prompt for Gemini AI image generation that will produce a beautiful, atmospheric village scene suitable for a collaborative farming game.
+
+Make sure that the camera is from a near-birdseye perspective. We want to be able to showcase a lot of land that we can further develop later on a near equally-distant plane from the camera.
+
+Return only the optimized prompt, no additional text or explanation.`;
+
+      // Use existing LLM service
+      if (!this.llmPromptService) {
+        return userDescription; // Fallback to original if LLM service not available
+      }
+
+      const response = await this.llmPromptService.generate(optimizationPrompt);
+      return response ? response.trim() : userDescription; // Fallback to original if LLM fails
+    }
+
+    private validateMeDescription(description: string): { valid: boolean, error?: string } {
      if (description.length < 10) {
        return { valid: false, error: 'Description must be at least 10 characters long.' };
      }

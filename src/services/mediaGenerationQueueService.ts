@@ -67,6 +67,8 @@ export class MediaGenerationQueueService {
       let result: any;
       if (job.jobType === 'BASELINE' || job.jobType === 'VILLAGE_BASELINE' || job.jobType === 'OBJECT_BASELINE') {
         result = await this.processBaselineJob(job);
+      } else if (job.jobType === 'CINEMATIC_PLANTING') {
+        result = await this.processCinematicPlantingJob(job);
       } else {
         result = await this.processMediaJob(job);
       }
@@ -182,6 +184,27 @@ export class MediaGenerationQueueService {
   }
 
 
+
+  // Process cinematic planting jobs
+  private async processCinematicPlantingJob(job: any): Promise<any> {
+    // Fetch user to get baseline URL
+    const user = await this.userRepository.findById(job.userId);
+    const baselineImageUrl = user?.baselineUrl;
+
+    const mediaData = await this.mediaService.generateMedia({
+      prompt: job.prompt || `Generate cinematic planting scene`,
+      type: 'image',
+      baselineImageUrl: baselineImageUrl || undefined,
+      jobType: 'CINEMATIC_PLANTING'
+    });
+
+    return {
+      type: 'cinematic-planting',
+      url: mediaData.url,
+      filename: mediaData.filename,
+      mimeType: 'image/png',
+    };
+  }
 
   // Process regular media generation jobs
   private async processMediaJob(job: any): Promise<any> {

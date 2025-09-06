@@ -10,7 +10,7 @@ export enum CommandName {
 
 // NEW: Interface for async work results
 export interface AsyncWorkResult {
-  mediaData?: MediaData;  // Optional generated media
+  mediaData?: MediaData | MediaData[];  // Optional generated media (single or multiple)
   message?: string;       // Optional text content
   mentions?: string[];    // User IDs to mention in the followup
 }

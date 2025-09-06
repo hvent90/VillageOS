@@ -131,6 +131,7 @@ enum JobType {
   VILLAGE_BASELINE // Village baseline generation
   OBJECT_BASELINE // Object baseline generation
   ACTION_IMAGE // Regular action images
+  CINEMATIC_PLANTING // Cinematic planting scene generation
 }
 
 enum JobStatus {

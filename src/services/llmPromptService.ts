@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import logger from '../config/logger';
+import { SupabaseMediaService } from './supabaseMediaService';
 
 export interface PromptEnhancementRequest {
   basePrompt: string;
@@ -299,5 +300,88 @@ export class LLMPromptService {
     }
 
     return enhancement;
+  }
+
+  async generateCinematicPlantingPrompt(
+    plantDescription: string,
+    userImageData?: Buffer | string,
+    villageImageData?: Buffer | string,
+    supabaseMediaService?: SupabaseMediaService
+  ): Promise<string> {
+    const prompt = `You are creating a cinematic prompt for an AI image generator to show a character planting ${plantDescription} in their village.
+
+CORE REQUIREMENTS:
+- Create a dramatic, cinematic close-up scene
+- Show the character actively planting the ${plantDescription}
+- Use professional cinematography techniques
+- Maintain visual consistency with the reference images
+- Focus on the planting action and character expression
+
+CINEMATIC ELEMENTS:
+- Dramatic lighting and shadows
+- Professional camera angles (Dutch angle, low angle, etc.)
+- Rich environmental details
+- Atmospheric effects (dust, light rays, etc.)
+- Emotional character expression during planting
+
+COMPOSITION:
+- Close-up or medium shot focusing on character and plant
+- Rule of thirds composition
+- Leading lines from planting tools to plant
+- Depth of field effects
+
+STYLE CONSISTENCY:
+- Match the character's appearance exactly from the reference image
+- Match the village environment from the second reference image
+- Maintain the same art style and visual quality`;
+
+    // Prepare image data for multi-modal generation
+    const imageData: Array<{ data: Buffer | string, mimeType: string }> = [];
+
+    if (userImageData) {
+      if (typeof userImageData === 'string' && userImageData.startsWith('http')) {
+        // It's a URL, fetch the image data
+        if (supabaseMediaService) {
+          try {
+            const fetchedData = await supabaseMediaService.fetchImageDataFromUrl(userImageData);
+            imageData.push({
+              data: fetchedData.data.toString('base64'),
+              mimeType: fetchedData.mimeType
+            });
+          } catch (error) {
+            logger.warn(`Failed to fetch user image data from URL: ${error}`);
+          }
+        }
+      } else {
+        // It's already buffer or base64 data
+        imageData.push({ data: userImageData, mimeType: 'image/jpeg' });
+      }
+    }
+
+    if (villageImageData) {
+      if (typeof villageImageData === 'string' && villageImageData.startsWith('http')) {
+        // It's a URL, fetch the image data
+        if (supabaseMediaService) {
+          try {
+            const fetchedData = await supabaseMediaService.fetchImageDataFromUrl(villageImageData);
+            imageData.push({
+              data: fetchedData.data.toString('base64'),
+              mimeType: fetchedData.mimeType
+            });
+          } catch (error) {
+            logger.warn(`Failed to fetch village image data from URL: ${error}`);
+          }
+        }
+      } else {
+        // It's already buffer or base64 data
+        imageData.push({ data: villageImageData, mimeType: 'image/jpeg' });
+      }
+    }
+
+    if (imageData.length > 0) {
+      return await this.generate(prompt, imageData);
+    } else {
+      return await this.generate(prompt);
+    }
   }
 }

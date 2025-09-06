@@ -1,5 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
+import https from 'https';
+import http from 'http';
 
 export interface TempFileInfo {
   filepath: string;
@@ -71,6 +73,40 @@ export class SupabaseMediaService {
       .getPublicUrl(permanentPath);
 
     return publicUrl;
+  }
+
+  async fetchImageDataFromUrl(url: string): Promise<{ data: Buffer, mimeType: string }> {
+    return new Promise((resolve, reject) => {
+      const protocol = url.startsWith('https:') ? https : http;
+
+      protocol.get(url, (response) => {
+        if (response.statusCode !== 200) {
+          reject(new Error(`Failed to fetch image: HTTP ${response.statusCode}`));
+          return;
+        }
+
+        const contentType = response.headers['content-type'] || 'image/jpeg';
+        const chunks: Buffer[] = [];
+
+        response.on('data', (chunk) => {
+          chunks.push(chunk);
+        });
+
+        response.on('end', () => {
+          const buffer = Buffer.concat(chunks);
+          resolve({
+            data: buffer,
+            mimeType: contentType
+          });
+        });
+
+        response.on('error', (error) => {
+          reject(new Error(`Failed to fetch image data: ${error.message}`));
+        });
+      }).on('error', (error) => {
+        reject(new Error(`Failed to fetch image: ${error.message}`));
+      });
+    });
   }
 
   private async startCleanupScheduler(): Promise<void> {

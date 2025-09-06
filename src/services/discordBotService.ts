@@ -156,17 +156,22 @@ export class DiscordBotService {
 
   private async sendAsyncResult(interaction: ChatInputCommandInteraction, asyncResult: AsyncWorkResult): Promise<void> {
     if (asyncResult.mediaData) {
-      const embed = new EmbedBuilder()
-        .setTitle('🏘️ Village Image Generated!')
-        .setDescription(asyncResult.message || 'Here\'s your village!')
-        .setImage(asyncResult.mediaData.url)
-        .setColor(0x00ff00)
-        .setTimestamp();
+      // Handle both single media and array of media
+      const mediaItems = Array.isArray(asyncResult.mediaData) ? asyncResult.mediaData : [asyncResult.mediaData];
 
-      await interaction.followUp({
-        embeds: [embed]
-        // No ephemeral flag - image visible to everyone
-      });
+      for (const mediaData of mediaItems) {
+        const embed = new EmbedBuilder()
+          .setTitle(mediaData.caption || '🏘️ Village Image Generated!')
+          .setDescription(asyncResult.message || 'Here\'s your village!')
+          .setImage(mediaData.url)
+          .setColor(0x00ff00)
+          .setTimestamp();
+
+        await interaction.followUp({
+          embeds: [embed]
+          // No ephemeral flag - image visible to everyone
+        });
+      }
     } else if (asyncResult.message) {
       await interaction.followUp({
         content: asyncResult.message,

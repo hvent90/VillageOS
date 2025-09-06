@@ -24,6 +24,10 @@ export class MediaGenerationService {
     });
   }
 
+  getSupabaseMediaService(): SupabaseMediaService {
+    return this.mediaService;
+  }
+
   private enhancePromptWithoutBaseline(prompt: string): string {
     // Enhanced prompt following Google's guidelines for detailed image generation
     return `${prompt}
@@ -58,6 +62,29 @@ Ensure the image is suitable for a family-friendly game environment.
 Focus on creating a cohesive character design that will work well in various village scenes.
 Style: Professional portrait photography with warm, natural lighting.
 Composition: Head and shoulders view, centered, with clean background.`;
+  }
+
+  private enhanceCinematicPlantingPrompt(basePrompt: string): string {
+    return `${basePrompt}
+
+CINEMATIC ENHANCEMENT:
+- Use cinematic lighting techniques (rim lighting, practical lights)
+- Professional composition with leading lines and rule of thirds
+- Atmospheric depth with foreground/background separation
+- Dramatic camera angles that emphasize the planting action
+- High production value with rich visual details
+
+TECHNICAL SPECIFICATIONS:
+- High resolution with crisp details
+- Professional color grading
+- Depth of field for cinematic focus
+- Dynamic range with proper exposure
+
+COMPOSITION GUIDELINES:
+- Close-up or medium shot focusing on character and plant
+- Rule of thirds composition
+- Leading lines from planting tools to plant
+- Depth of field effects for cinematic quality`;
   }
 
   async generateMedia(request: MediaGenerationRequest): Promise<TempFileInfo> {
@@ -136,15 +163,17 @@ Reference Guidelines:
            // Fall back to enhanced text prompt
            request.prompt = this.enhancePromptWithoutBaseline(request.prompt);
          }
-       } else {
-          // If no baseline, use enhanced text prompt with detailed description
-          request.prompt = this.enhancePromptWithoutBaseline(request.prompt);
+        } else {
+           // If no baseline, use enhanced text prompt with detailed description
+           request.prompt = this.enhancePromptWithoutBaseline(request.prompt);
 
-          // Apply additional enhancement for character customization
-          if (request.jobType === 'BASELINE') {
-            request.prompt = this.enhanceMePrompt(request.prompt);
-          }
-        }
+           // Apply additional enhancement for character customization
+           if (request.jobType === 'BASELINE') {
+             request.prompt = this.enhanceMePrompt(request.prompt);
+           } else if (request.jobType === 'CINEMATIC_PLANTING') {
+             request.prompt = this.enhanceCinematicPlantingPrompt(request.prompt);
+           }
+         }
 
       const response = await this.ai.models.generateContent({
         model: "gemini-2.5-flash-image-preview",
