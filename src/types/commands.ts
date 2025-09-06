@@ -7,7 +7,7 @@ export interface CommandInput {
   targetUserId?: string;
   serverId: string;
   channelId: string;
-  args?: string[];
+  args?: string[] | any; // Support both legacy string[] and Discord object format
   userDescription?: string;  // For character customization
   villageDescription?: string;  // NEW: For village creation
   referenceImageUrl?: string; // NEW: Optional reference image URL

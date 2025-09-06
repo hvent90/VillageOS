@@ -154,6 +154,18 @@ This will serve as the village's visual representation in the game showing all c
     }
   }
 
+  async generateStructureBaseline(structureDescription: string): Promise<string> {
+    const prompt = await this.llmPromptService.generate(this.createStructureBaselinePrompt(structureDescription));
+
+    const tempFileInfo = await this.mediaGenerationService.generateMedia({
+      prompt,
+      type: 'image',
+      jobType: 'OBJECT_BASELINE'
+    });
+
+    return tempFileInfo.url;
+  }
+
   async generatePlantBaseline(plantDescription: string): Promise<string> {
     const prompt = await this.llmPromptService.generate(this.createPlantBaselinePrompt(plantDescription));
 
@@ -166,6 +178,13 @@ This will serve as the village's visual representation in the game showing all c
     return tempFileInfo.url;
   }
 
+  private createStructureBaselinePrompt(structureDescription: string): string {
+    return `A detailed structure: ${structureDescription}.
+Show as a small building/structure suitable for a farming village.
+If the user has not specified a style or aesthetic, default to a cute pixel-art style.
+Single structure, centered, no other objects. Generate exactly what the user described.`;
+  }
+
   private createPlantBaselinePrompt(plantDescription: string): string {
     return `A detailed plant: ${plantDescription}.
 Show as a small seedling just sprouted from the ground.
@@ -176,28 +195,29 @@ Single plant, centered, no other objects. Generate exactly what the user describ
   async updateVillageBaseline(
     villageName: string,
     currentVillageBaselineUrl: string,
-    plantBaselineUrl: string,
+    objectBaselineUrl: string,
     gridX: number,
-    gridY: number
+    gridY: number,
+    objectType: 'plant' | 'structure' = 'plant'
   ): Promise<string> {
-    // Fetch both plant baseline and village baseline images for multi-modal prompt generation
-    const [plantImageResponse, villageImageResponse] = await Promise.all([
-      fetch(plantBaselineUrl),
+    // Fetch both object baseline and village baseline images for multi-modal prompt generation
+    const [objectImageResponse, villageImageResponse] = await Promise.all([
+      fetch(objectBaselineUrl),
       fetch(currentVillageBaselineUrl)
     ]);
 
-    const [plantImageBuffer, villageImageBuffer] = await Promise.all([
-      plantImageResponse.arrayBuffer(),
+    const [objectImageBuffer, villageImageBuffer] = await Promise.all([
+      objectImageResponse.arrayBuffer(),
       villageImageResponse.arrayBuffer()
     ]);
 
     const imageData = [
-      { data: Buffer.from(plantImageBuffer), mimeType: 'image/png' },     // Plant baseline
+      { data: Buffer.from(objectImageBuffer), mimeType: 'image/png' },   // Object baseline
       { data: Buffer.from(villageImageBuffer), mimeType: 'image/png' }   // Village baseline
     ];
 
     const prompt = await this.llmPromptService.generate(
-      this.createVillageBaselineUpdatePrompt(villageName, gridX, gridY),
+      this.createVillageBaselineUpdatePrompt(villageName, gridX, gridY, objectType),
       imageData
     );
 
@@ -205,28 +225,30 @@ Single plant, centered, no other objects. Generate exactly what the user describ
       prompt,
       type: 'image',
       jobType: 'ADDING_PLANT_TO_VILLAGE',
-      baselineImages: [currentVillageBaselineUrl, plantBaselineUrl]
+      baselineImages: [currentVillageBaselineUrl, objectBaselineUrl]
     });
 
     return tempFileInfo.url;
   }
 
-  private createVillageBaselineUpdatePrompt(villageName: string, gridX: number, gridY: number): string {
-    return `You are adding a plant to an existing village scene. You have two reference images:
-1. First image: The plant's appearance that needs to be added
-2. Second image: The current village scene where the plant should be placed
+  private createVillageBaselineUpdatePrompt(villageName: string, gridX: number, gridY: number, objectType: 'plant' | 'structure' = 'plant'): string {
+    const objectTypeText = objectType === 'plant' ? 'plant' : 'structure';
 
-Update the existing village landscape by adding a single instance of the plant from the first reference image to the village scene shown in the second reference image.
+    return `You are adding a ${objectTypeText} to an existing village scene. You have two reference images:
+1. First image: The ${objectTypeText}'s appearance that needs to be added
+2. Second image: The current village scene where the ${objectTypeText} should be placed
+
+Update the existing village landscape by adding a single instance of the ${objectTypeText} from the first reference image to the village scene shown in the second reference image.
 
 CRITICAL REQUIREMENTS:
-- The plant must match EXACTLY the appearance, colors, and features shown in the first reference image
-- Use the second reference image to understand the current village layout, existing plants, and available space
-- Place the plant at a reasonable size that doesn't dominate the scene
-- Position the plant in an orderly location within the farm/dirt area that doesn't overlap existing elements
+- The ${objectTypeText} should maintain the same core visual characteristics (colors, style, key features) as shown in the first reference image
+- Feel free to adjust perspective, angle, and lighting as needed to make the ${objectTypeText} fit naturally into the village composition
+- Use the second reference image to understand the current village layout, existing elements, and available space
+- Place the ${objectTypeText} at a reasonable size that fits naturally in the scene
+- Position the ${objectTypeText} in an appropriate location within the village that doesn't overlap existing elements
 - Maintain the same art style and visual quality as both reference images
-- The plant should be INSIDE the farm/dirt area, not on paths or buildings
-- Ensure the plant fits naturally into the existing village composition
+- Ensure the ${objectTypeText} fits naturally into the existing village composition
 
-Both reference images show the exact visual context needed for accurate plant placement.`;
+Both reference images show the visual context needed for natural ${objectTypeText} placement.`;
   }
 }

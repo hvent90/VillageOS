@@ -63,19 +63,12 @@ export const slashCommands = [
        subcommand
          .setName('build')
          .setDescription('🏗️ Build structures in your village')
-         .addIntegerOption(option =>
-           option.setName('x')
-             .setDescription('X coordinate')
+         .addStringOption(option =>
+           option.setName('description')
+             .setDescription('What do you want to build? (e.g., "wooden shed", "stone well", "fence")')
              .setRequired(true)
-             .setMinValue(0)
-             .setMaxValue(9)
-         )
-         .addIntegerOption(option =>
-           option.setName('y')
-             .setDescription('Y coordinate')
-             .setRequired(true)
-             .setMinValue(0)
-             .setMaxValue(9)
+             .setMinLength(2)
+             .setMaxLength(50)
          )
      )
       .addSubcommand(subcommand =>
