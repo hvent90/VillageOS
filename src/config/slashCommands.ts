@@ -32,19 +32,12 @@ export const slashCommands = [
       subcommand
         .setName('plant')
         .setDescription('🌱 Plant crops in your village')
-        .addIntegerOption(option =>
-          option.setName('x')
-            .setDescription('X coordinate')
+        .addStringOption(option =>
+          option.setName('crop')
+            .setDescription('What do you want to plant? (e.g., "tomatoes", "wheat", "magical sunflowers")')
             .setRequired(true)
-            .setMinValue(0)
-            .setMaxValue(9)
-        )
-        .addIntegerOption(option =>
-          option.setName('y')
-            .setDescription('Y coordinate')
-            .setRequired(true)
-            .setMinValue(0)
-            .setMaxValue(9)
+            .setMinLength(2)
+            .setMaxLength(50)
         )
     )
     .addSubcommand(subcommand =>
