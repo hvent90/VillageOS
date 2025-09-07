@@ -11,7 +11,8 @@ Or add the bot to your server: [https://discord.com/oauth2/authorize?client_id=1
 - `/village me description:"Custom appearance"` - Customize your character
 - `/village create name:"My Farm"` - Create your own village (one per server)
 - `/village show` - View your village status
-- `/village plant <x> <y>` - Plant crops at coordinates
+- `/village plant description:"Magical fire pineapple"`
+- `/village build description:"Fence surrounding the farm"`
 - `/village water <x> <y>` - Water your crops
 
 ### The Secret Sauce
